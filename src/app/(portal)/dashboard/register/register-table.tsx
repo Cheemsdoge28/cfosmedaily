@@ -12,6 +12,7 @@ import {
   Th,
   Tr,
 } from "@/components/ui/primitives";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { setTaskProgress, setTaskStatus } from "@/lib/tasks/actions";
 import {
   formatDate,
@@ -153,15 +154,31 @@ function TaskRowCells({
         </Td>
       )}
 
-      <Td>
-        <span className="font-medium text-foreground">
+      <Td className="max-w-md">
+        <span className="block truncate font-medium text-foreground">
           {task.activity || task.process}
         </span>
-        <br />
-        <span className="text-xs text-muted-foreground">
-          {task.process}
-          {task.description ? ` · ${task.description}` : ""}
-        </span>
+        {task.description ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <span className="block max-w-full truncate text-xs text-muted-foreground" />
+              }
+            >
+              {task.process} · {task.description}
+            </TooltipTrigger>
+            <TooltipContent
+              className="max-w-[min(28rem,calc(100vw-2rem))] whitespace-normal wrap-break-word"
+              side="top"
+            >
+              {task.process} · {task.description}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <span className="block truncate text-xs text-muted-foreground">
+            {task.process}
+          </span>
+        )}
         {error && (
           // role="alert" so the failure is announced, not just coloured.
           <span role="alert" className="mt-1 block text-xs text-tone-bad">

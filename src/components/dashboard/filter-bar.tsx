@@ -131,7 +131,7 @@ export function FilterBar({ filters }: { filters: ResolvedFilters }) {
 
       {/* Two and three-column layouts leave this one orphaned beside a gap, so it
           takes the rest of the row until every field fits on one. */}
-      <div className="col-span-2 sm:col-span-3 xl:col-span-1">
+      <div className="col-span-2 self-end -translate-y-1.5 sm:col-span-3 xl:col-span-1">
         <Button
           type="button"
           variant="outline"
