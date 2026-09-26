@@ -1,0 +1,551 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * RISEBIT CFO design tokens.
+ *
+ * shadcn's token names are the single source of truth — they are simply given
+ * RISEBIT's values rather than the stock neutral greys, so every shadcn
+ * component inherits the brand without being restyled one by one. The few
+ * app-specific tokens below (chrome, status tones, chart colours) are the ones
+ * shadcn has no equivalent for.
+ *
+ * Dark mode keys off `.dark`, shadcn's convention. The theme script stamps both
+ * that class and `data-theme`, the latter being what the charts read to pick
+ * real colour values — an SVG fill cannot be a CSS variable that Recharts
+ * interpolates.
+ */
+
+:root {
+  --radius: 0.75rem;
+
+  /* Surfaces and text. */
+  --background: #f4f6f9;
+  --foreground: #1d2939;
+  --card: #ffffff;
+  --card-foreground: #1d2939;
+  --popover: #ffffff;
+  --popover-foreground: #1d2939;
+
+  --primary: #10233f;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #10233f;
+  --muted: #f8fafc;
+  --muted-foreground: #667085;
+  --accent: #f1f5f9;
+  --accent-foreground: #10233f;
+  --destructive: #d64545;
+
+  --border: #e5e7eb;
+  --input: #d0d5dd;
+  --ring: #c8a24a;
+
+  --sidebar: #10233f;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #c8a24a;
+  --sidebar-primary-foreground: #10233f;
+  --sidebar-accent: rgb(255 255 255 / 0.14);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / 0.10);
+  --sidebar-ring: #c8a24a;
+
+  /* Brand — fixed in both themes. */
+  --brand-navy: #10233f;
+  --brand-navy-600: #19365c;
+  --brand-navy-800: #0d1f38;
+  --brand-gold: #c8a24a;
+
+  /* App surfaces shadcn has no name for. */
+  --surface-2: #f8fafc;
+  --surface-3: #f1f5f9;
+  --heading: #10233f;
+  --line-strong: #d0d5dd;
+
+  /* Status. */
+  --positive: #168a5b;
+  --negative: #d64545;
+  --caution: #946c00;
+
+  --tone-good-bg: #e7f6ef;
+  --tone-good-fg: #12684a;
+  --tone-warn-bg: #fdf3da;
+  --tone-warn-fg: #8a6300;
+  --tone-bad-bg: #fdeaea;
+  --tone-bad-fg: #a92d2d;
+  --tone-neutral-bg: #f1f5f9;
+  --tone-neutral-fg: #475569;
+
+  /*
+   * Charts. Validated with the data-viz checker against the light card surface:
+   * the series pair clears adjacent CVD ΔE 24.7 and 3:1 contrast, and the
+   * ordinal ramp is single-hue, monotone and clears the light-end floor.
+   */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #6845d8;
+  --chart-6: #e87ba4;
+  --chart-grid: #eef1f5;
+  --chart-tick: #667085;
+  --chart-ordinal-1: #86b6ef;
+  --chart-ordinal-2: #5598e7;
+  --chart-ordinal-3: #2a78d6;
+  --chart-ordinal-4: #1c5cab;
+  --chart-ordinal-5: #104281;
+}
+
+/*
+ * Dark theme. Chosen against the dark ground rather than inverted: the series
+ * pair was re-validated on this surface (CVD ΔE 26.8, both above 3:1) and the
+ * ordinal ramp re-stepped so its light end still clears the surface.
+ */
+.dark {
+  --background: #0b1119;
+  --foreground: #e8edf5;
+  --card: #141d2e;
+  --card-foreground: #e8edf5;
+  --popover: #1a2438;
+  --popover-foreground: #e8edf5;
+
+  --primary: #2b5ea8;
+  --primary-foreground: #ffffff;
+  --secondary: #1a2438;
+  --secondary-foreground: #e8edf5;
+  --muted: #1a2438;
+  --muted-foreground: #94a3b8;
+  --accent: #212d44;
+  --accent-foreground: #f2f6fc;
+  --destructive: #f87171;
+
+  --border: #263349;
+  --input: #33425c;
+  --ring: #c8a24a;
+
+  --sidebar: #0d1626;
+  --sidebar-foreground: #ffffff;
+  --sidebar-accent: rgb(255 255 255 / 0.10);
+  --sidebar-border: rgb(255 255 255 / 0.08);
+
+  --surface-2: #1a2438;
+  --surface-3: #212d44;
+  --heading: #f2f6fc;
+  --line-strong: #33425c;
+
+  --positive: #34c98b;
+  --negative: #f87171;
+  --caution: #e0b054;
+
+  --tone-good-bg: #10321f;
+  --tone-good-fg: #6ee7a8;
+  --tone-warn-bg: #36280c;
+  --tone-warn-fg: #f0c674;
+  --tone-bad-bg: #3a1a1c;
+  --tone-bad-fg: #fca5a5;
+  --tone-neutral-bg: #1e2a3d;
+  --tone-neutral-fg: #a3b2c7;
+
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #9085e9;
+  --chart-6: #d55181;
+  --chart-grid: #22304a;
+  --chart-tick: #94a3b8;
+  --chart-ordinal-1: #184f95;
+  --chart-ordinal-2: #256abf;
+  --chart-ordinal-3: #3987e5;
+  --chart-ordinal-4: #6da7ec;
+  --chart-ordinal-5: #9ec5f4;
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: var(--font-sans);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* App aliases, so existing markup keeps reading naturally. */
+  --color-canvas: var(--background);
+  --color-surface: var(--card);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-ink: var(--foreground);
+  --color-heading: var(--heading);
+  --color-line: var(--border);
+  --color-line-strong: var(--line-strong);
+  --color-navy: var(--brand-navy);
+  --color-navy-600: var(--brand-navy-600);
+  --color-navy-800: var(--brand-navy-800);
+  --color-gold: var(--brand-gold);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-caution: var(--caution);
+
+  /*
+   * Corner radii, and concentricity.
+   *
+   * Two rounded shapes only look like one object when they share a centre of
+   * curvature. That happens when the inner radius is the outer radius minus
+   * the gap between them: nest a 10px corner inside a 16px one with 6px of
+   * padding and the two arcs run parallel; use the same 10px with 2px of
+   * padding and they visibly cross.
+   *
+   * So the inset steps below are derived, never chosen. Whenever something is
+   * nested tightly enough for its corner to fall inside its parent's arc, it
+   * takes the step matching its padding — `--radius-inset-1` inside 4px of
+   * padding, `--radius-inset-2` inside 8px, `--radius-inset-3` inside 12px.
+   * Past that the child's corner sits on the parent's straight edge and any
+   * radius reads correctly, which is why most cards need no thought at all.
+   */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-card: calc(var(--radius) * 1.4);
+  --radius-kpi: calc(var(--radius) * 1.4);
+
+  --radius-inset-1: calc(var(--radius-card) - 0.25rem);
+  --radius-inset-2: calc(var(--radius-card) - 0.5rem);
+  --radius-inset-3: calc(var(--radius-card) - 0.75rem);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    color-scheme: light;
+    @apply font-sans;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Keyboard focus is always visible — the legacy page removed outlines. */
+  :focus-visible {
+    outline: 2px solid var(--brand-gold);
+    outline-offset: 2px;
+  }
+
+  /* Respect a user who has asked for less motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /*
+   * KPI card gradients. Each module's KPI row reuses these six in order, which
+   * is what gave the original dashboard its recognisable look. They carry their
+   * own white text, so they are deliberately not themed — only deepened in dark
+   * so the cards sit on the ground rather than glow.
+   */
+  .kpi-gradient-0 {
+    background-image: linear-gradient(135deg, #1769d5, #0d56bd 58%, #164b9c);
+  }
+  .kpi-gradient-1 {
+    background-image: linear-gradient(135deg, #18a957, #11854a 58%, #12663e);
+  }
+  .kpi-gradient-2 {
+    background-image: linear-gradient(135deg, #f3a51b, #d6810d 58%, #b96b0b);
+  }
+  .kpi-gradient-3 {
+    background-image: linear-gradient(135deg, #6845d8, #5235b7 58%, #402c96);
+  }
+  .kpi-gradient-4 {
+    background-image: linear-gradient(135deg, #11aeb3, #078e98 58%, #087b83);
+  }
+  .kpi-gradient-5 {
+    background-image: linear-gradient(135deg, #1c559f, #17478b 58%, #12396f);
+  }
+
+  .dark .kpi-gradient-0 {
+    background-image: linear-gradient(135deg, #1559b4, #0b47a0 58%, #123d80);
+  }
+  .dark .kpi-gradient-1 {
+    background-image: linear-gradient(135deg, #148c48, #0e6d3c 58%, #0d5333);
+  }
+  .dark .kpi-gradient-2 {
+    background-image: linear-gradient(135deg, #cc8813, #b06a0b 58%, #965609);
+  }
+  .dark .kpi-gradient-3 {
+    background-image: linear-gradient(135deg, #573ab4, #442c97 58%, #35247b);
+  }
+  .dark .kpi-gradient-4 {
+    background-image: linear-gradient(135deg, #0e9095, #06757e 58%, #06646b);
+  }
+  .dark .kpi-gradient-5 {
+    background-image: linear-gradient(135deg, #174785, #133b73 58%, #0f2f5c);
+  }
+
+  /* The diagonal bar motif behind each KPI card. */
+  .kpi-motif::after {
+    content: "";
+    position: absolute;
+    right: -0.75rem;
+    bottom: -1.125rem;
+    width: 6.25rem;
+    height: 5.75rem;
+    opacity: 0.15;
+    transform: skewY(-12deg);
+    pointer-events: none;
+    background-image: linear-gradient(
+      to top,
+      transparent 0 8%,
+      #fff 8% 17%,
+      transparent 17% 27%,
+      #fff 27% 39%,
+      transparent 39% 49%,
+      #fff 49% 63%,
+      transparent 63% 72%,
+      #fff 72% 88%,
+      transparent 88%
+    );
+  }
+
+  /* Status pills. */
+  .tone-good {
+    background-color: var(--tone-good-bg);
+    color: var(--tone-good-fg);
+  }
+  .tone-warn {
+    background-color: var(--tone-warn-bg);
+    color: var(--tone-warn-fg);
+  }
+  .tone-bad {
+    background-color: var(--tone-bad-bg);
+    color: var(--tone-bad-fg);
+  }
+  .tone-neutral {
+    background-color: var(--tone-neutral-bg);
+    color: var(--tone-neutral-fg);
+  }
+
+  /* Inline form messages: the tone's foreground with no fill behind it. */
+  .text-tone-good {
+    color: var(--tone-good-fg);
+  }
+  .text-tone-bad {
+    color: var(--tone-bad-fg);
+  }
+
+}
+
+@layer utilities {
+  /*
+   * Liquid glass.
+   *
+   * The material Apple uses for chrome that floats over content: it samples
+   * what is behind it, blurs and brightens it, and carries a fine specular
+   * line along its lit edge so it reads as a physical layer rather than a
+   * tinted box. It belongs on things that pass over the page — the top bar,
+   * the sidebar, menus, sheets — and nowhere near a table of figures, where
+   * anything showing through costs legibility for no benefit.
+   *
+   * Three deliberate details:
+   *
+   *   saturate()      blur alone leaves the backdrop grey and lifeless; the
+   *                   saturation boost is what makes it read as glass.
+   *   inset top line  the specular highlight. White in light mode, dimmer in
+   *                   dark, where a bright rim would look like a seam.
+   *   opaque fallback for `prefers-reduced-transparency`, and for any browser
+   *                   without backdrop-filter — the layer must never become
+   *                   unreadable because an effect did not apply.
+   */
+  .glass {
+    background-color: color-mix(in oklch, var(--card) 72%, transparent);
+    backdrop-filter: blur(24px) saturate(180%);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.55),
+      0 1px 2px rgb(16 35 63 / 0.04),
+      0 8px 24px -12px rgb(16 35 63 / 0.18);
+  }
+
+  .dark .glass {
+    background-color: color-mix(in oklch, var(--card) 66%, transparent);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.07),
+      0 1px 2px rgb(0 0 0 / 0.3),
+      0 8px 24px -12px rgb(0 0 0 / 0.5);
+  }
+
+  /*
+   * The navy chrome.
+   *
+   * Deliberately NOT translucent. Glass earns its place where content passes
+   * beneath a layer; the sidebar sits beside the content and nothing ever
+   * travels under it, so transparency bought nothing here and cost the brand
+   * navy — mixed with the light page ground it came out a washed blue-grey.
+   * What it keeps from the material is the part that was doing real work: the
+   * specular edge and the depth shadow that lift it off the page.
+   */
+  .glass-sidebar {
+    background-color: var(--sidebar);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.10),
+      0 12px 32px -16px rgb(16 35 63 / 0.45);
+  }
+
+  .dark .glass-sidebar {
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.10),
+      0 0 0 1px rgb(255 255 255 / 0.06),
+      0 12px 32px -16px rgb(0 0 0 / 0.7);
+  }
+
+  @supports not (backdrop-filter: blur(1px)) {
+    .glass {
+      background-color: var(--card);
+    }
+  }
+
+  /*
+   * Someone who has asked for less transparency has asked for exactly that:
+   * the blur goes, the surface becomes solid, and the specular edge stays
+   * because it is what still separates the layer from the page.
+   */
+  @media (prefers-reduced-transparency: reduce) {
+    .glass {
+      background-color: var(--card);
+      backdrop-filter: none;
+    }
+  }
+
+  /*
+   * The content panel's own scrollbar.
+   *
+   * Now that the panel scrolls itself, a full-width platform scrollbar sits
+   * inside its rounded corner and cuts across the arc. Thin and translucent
+   * it reads as part of the panel, and it only takes a colour while the
+   * pointer is over it.
+   */
+  .panel-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    transition: scrollbar-color 0.2s ease-out;
+  }
+
+  .panel-scroll:hover,
+  .panel-scroll:focus-within {
+    scrollbar-color: color-mix(in oklch, var(--foreground) 22%, transparent)
+      transparent;
+  }
+
+  /* Content settling in, used on cards and rows as they mount. */
+  @keyframes risebit-rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .animate-rise {
+    animation: risebit-rise 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Numbers that change when a filter changes. */
+  @keyframes risebit-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .animate-figure {
+    animation: risebit-fade 0.28s ease-out both;
+  }
+}
+
+/* Print / PDF: drop the chrome so the figures fill the page (SOP §12). */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  .print-full {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  /*
+   * The content panel is a fixed-height scrollport on screen. Printing it in
+   * that state puts one screenful on the page and throws the rest away, so
+   * for print it becomes an ordinary block that flows over as many sheets as
+   * the figures need.
+   */
+  [data-slot="sidebar-inset"] {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+}

@@ -1,0 +1,278 @@
+// CFOSME Pulse Pro — data model
+//
+// Design notes
+// ────────────
+// 1. Multi-tenant. Every business row carries `clientId`; the session pins the
+//    tenant and all queries are scoped by it (see src/lib/tasks/scope.ts).
+//    CFOSME staff are PLATFORM_ADMIN and read across every client, which is
+//    what the executive dashboard's cross-client comparisons need.
+// 2. Credentials live here, hashed with bcrypt — never in a config file.
+// 3. Sessions are server-side and revocable: the cookie holds an opaque token,
+//    the database stores only its SHA-256 hash.
+// 4. A task's *state* is two stored fields — `status` and `progress` — and
+//    nothing else. Completion rates, overdue counts and the client and owner
+//    rollups are derived at query time, so a figure on the dashboard can never
+//    disagree with the register it came from.
+// 5. Due dates are stored twice on purpose. `dueDate` is the resolved calendar
+//    date the dashboard counts as overdue; `dueText` keeps what the workbook
+//    actually said when the cell was not a date ("20th Sept "), so a reader can
+//    always see the source wording and an unresolvable cell is visibly
+//    unresolved rather than silently dropped.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// Connection URLs live in prisma.config.ts (Prisma 7 moved them out of the
+// schema). See DATABASE_URL / DIRECT_URL in .env.example.
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tenancy and access
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A client company whose compliance and reporting calendar CFOSME runs.
+model Client {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  legalName String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  tasks     Task[]
+  auditLogs AuditLog[]
+
+  @@index([isActive])
+}
+
+enum Role {
+  /// CFOSME staff: cross-tenant access, may manage clients, logins and imports.
+  PLATFORM_ADMIN
+  /// Client-side administrator: full access to their own tenant.
+  CLIENT_ADMIN
+  /// Client-side read-only viewer.
+  VIEWER
+}
+
+/// A portal login.
+model User {
+  id           String  @id @default(cuid())
+  /// Null for PLATFORM_ADMIN accounts, which are not bound to one tenant.
+  clientId     String?
+  email        String  @unique
+  name         String
+  passwordHash String
+  role         Role    @default(VIEWER)
+  isActive     Boolean @default(true)
+
+  /// Brute-force protection.
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
+  lastLoginAt      DateTime?
+  /// Forces a password change on next sign-in (used after an admin reset).
+  mustChangePassword Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client       Client?      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  sessions     Session[]
+  auditLogs    AuditLog[]
+  taskEvents   TaskEvent[]
+  taskImports  TaskImport[]
+  tasksTouched Task[]       @relation("TaskLastUpdatedBy")
+
+  @@index([clientId])
+  @@index([email])
+}
+
+/// Server-side session. The cookie carries a random token; only its SHA-256
+/// hash is persisted, so a database leak cannot be replayed as a login.
+model Session {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  /// Absolute expiry. Idle expiry is enforced via `lastSeenAt`.
+  expiresAt  DateTime
+  lastSeenAt DateTime  @default(now())
+  ipAddress  String?
+  userAgent  String?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Append-only security and audit trail.
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  userId    String?
+  clientId  String?
+  detail    String?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([clientId])
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The task register
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Where a task stands. The five states the register has always used.
+enum TaskStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  AT_RISK
+  BLOCKED
+  DONE
+}
+
+/// How often a task comes round.
+///
+/// An enum rather than free text: the dashboard groups by it, and a workbook
+/// column will always drift to "Monthly" and "Monthly " as separate values. The
+/// importer maps case- and space-insensitively and reports anything it cannot
+/// place, rather than inventing a bucket for it.
+enum Frequency {
+  DAILY
+  WEEKLY
+  FORTNIGHTLY
+  MONTHLY
+  QUARTERLY
+  HALF_YEARLY
+  ANNUAL
+  AD_HOC
+}
+
+/// What moved a task — someone editing the register, or a workbook import.
+enum ChangeSource {
+  MANUAL
+  IMPORT
+}
+
+/// One recurring obligation for one client.
+model Task {
+  id       String @id @default(cuid())
+  clientId String
+  /// The workbook's own "Task ID" (TS0001). Globally unique there, so it is
+  /// the natural key an import upserts on — and it lets a task be moved
+  /// between clients by editing one cell, rather than being duplicated.
+  reference String @unique
+
+  process     String
+  activity    String
+  description String @default("")
+  /// The person accountable, as the workbook names them. Deliberately a string
+  /// and not a relation: owners are recorded by CFOSME in the workbook and are
+  /// not portal logins, so a foreign key would force an account for each.
+  owner     String
+  frequency Frequency
+
+  /// The cadence in the practice's own words — "8th", "3rd working day".
+  dueRule String    @default("")
+  /// The resolved due date, when one could be determined.
+  dueDate DateTime?
+  /// The workbook's raw wording, kept when the cell was not a real date.
+  dueText String?
+
+  status TaskStatus @default(NOT_STARTED)
+  /// 0-100. A CHECK constraint in the migration enforces the range in the
+  /// database as well, so a bad write cannot land even from outside the app.
+  progress Int    @default(0)
+  notes    String @default("")
+
+  /// Who last moved it, and when it last moved — the workbook's two trailing
+  /// columns, which the export writes back.
+  updatedById     String?
+  statusChangedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client    Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  updatedBy User?       @relation("TaskLastUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  events    TaskEvent[]
+
+  @@index([clientId])
+  @@index([status])
+  @@index([owner])
+  @@index([dueDate])
+  @@index([clientId, status])
+}
+
+/// Append-only history of every status or progress move.
+///
+/// The workbook could only ever hold the *latest* editor and timestamp, so who
+/// moved a task off "Blocked" last month was unrecoverable. This keeps the
+/// whole trail, which is what makes the register answerable after the fact.
+model TaskEvent {
+  id     String  @id @default(cuid())
+  taskId String
+  userId String?
+
+  fromStatus   TaskStatus?
+  toStatus     TaskStatus?
+  fromProgress Int?
+  toProgress   Int?
+  source       ChangeSource @default(MANUAL)
+  note         String?
+
+  createdAt DateTime @default(now())
+
+  task Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([taskId, createdAt])
+  @@index([createdAt])
+}
+
+enum ImportStatus {
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+/// One workbook upload, and what it did.
+///
+/// The spreadsheet is still where the practice keeps the register, so every
+/// import is recorded with its counts: an operator can see that last Tuesday's
+/// upload created four tasks and skipped two, without reading the audit log.
+model TaskImport {
+  id       String  @id @default(cuid())
+  userId   String?
+  fileName String
+
+  rowsRead  Int @default(0)
+  created   Int @default(0)
+  updated   Int @default(0)
+  unchanged Int @default(0)
+  skipped   Int @default(0)
+
+  /// Per-row problems, in the operator's words. Empty on a clean import.
+  errors     String[]
+  status     ImportStatus @default(RUNNING)
+  startedAt  DateTime     @default(now())
+  finishedAt DateTime?
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([startedAt])
+}
