@@ -1,4 +1,4 @@
-# RISEBIT CFO — design system
+# CFOSME Pulse Pro — design system
 
 One page, so that a new screen can be built without inventing anything.
 
@@ -12,8 +12,15 @@ Build from those and a page cannot drift; style a `<div>` by hand and it will.
 
 **shadcn/ui** (Base UI under the hood, not Radix — the APIs differ, see below)
 provides every control. Its tokens are not the stock neutral greys: they are
-redefined in `globals.css` with RISEBIT's values, so components inherit the
+redefined in `globals.css` with CFOSME's values, so components inherit the
 brand rather than being restyled one at a time.
+
+The brand values are sampled from the wordmark rather than chosen: it is drawn in
+a green (`#87b54b`) and a blue (`#22a3dc`), and those are the two accents. The
+deep chrome behind the sidebar is a dark step of that blue's own hue, because the
+wordmark carries no dark tone and the sidebar needs a ground that holds white type
+(12.1:1) and the green accent (5.0:1). The focus ring is the green stepped down
+until it clears 3:1 on the white page as well as on the dark card.
 
 Never style a control directly. If a button looks wrong everywhere, fix the
 token or the variant, not the call site.
@@ -50,9 +57,21 @@ Colour carries meaning or it does not appear.
   `src/components/charts/chart-tokens.ts`. Categorical hues are assigned in
   fixed order and never cycled.
 
-The KPI cards used to be six saturated gradients, one per metric. Revenue and
-EBITDA are not categories of anything, so the colour said nothing; they are
-plain surfaces now and the only tint is on the delta.
+**Task status** is the one place a fixed palette is reserved by meaning rather
+than by order: green for done, blue for in progress, amber for at risk, red for
+blocked, grey for not started. Those five live in `chart-tokens.ts` as `status`
+and are never reused as a series colour, because an unrelated amber bar would
+then read as "at risk". Being semantic, they are close in hue by construction, so
+they were validated on the pairlist that matters for a donut — adjacent slices,
+in draw order — where both modes clear CVD separation, the normal-vision floor
+and 3:1 on their surface. The one check they fail is the chroma floor, on "Not
+started" alone, and that is the intent: a grey that cleared the floor would stop
+reading as the absence of a state. Every slice is named and carries its count, so
+identity never rests on colour.
+
+The KPI cards used to be six saturated gradients, one per metric. Completion and
+Overdue are not categories of anything, so the colour said nothing; they are plain
+surfaces now and the only tint is on the figure that moved.
 
 ---
 
