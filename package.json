@@ -26,7 +26,8 @@
     "keygen": "tsx scripts/keygen.ts",
     "hash": "tsx scripts/hash-password.ts",
     "check": "tsx --conditions=react-server scripts/check-logic.ts",
-    "check:workbook": "tsx --conditions=react-server scripts/check-workbook.ts"
+    "check:workbook": "tsx --conditions=react-server scripts/check-workbook.ts",
+    "check:access": "tsx --conditions=react-server scripts/check-access.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

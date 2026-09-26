@@ -52,15 +52,33 @@ some things now behave differently:
 
 ## 3. Roles
 
+There are two roles, and then a list of grants.
+
 | Role | Who | Can do |
 |---|---|---|
-| CFOSME staff | The practice | Every client. Import the workbook, manage clients and logins, read the audit log. |
-| Client administrator | A client's own finance lead | Their own register, including editing status and progress. |
-| Viewer | Anyone at a client who only needs to look | Their own register, read-only. |
+| **CFOSME staff** | The practice | Every client. Import the workbook, manage clients and logins, read the audit log. |
+| **Member** | Everyone else | Exactly the clients granted to them, and nothing else. |
 
-A client login can never see another client's tasks. This is enforced when the
-data is fetched, not by hiding things on screen, so it cannot be worked around by
-editing the address bar.
+A member's access is granted **one client at a time**, and each grant is either:
+
+| Level | Means |
+|---|---|
+| **View only** | They can see the dashboard and register for that client. |
+| **Can edit** | They can also move tasks — set a status, drag progress. |
+
+Because the level is per client, one person can be **read-write on one client and
+read-only on another**. That is the normal case for a reviewer who owns some
+clients and only checks others, and it is why access is not a property of the
+account.
+
+A member can never see a client they have not been granted. This is enforced when
+the data is fetched, not by hiding things on screen, so it cannot be worked around
+by editing the address bar.
+
+**Staff hold no grants.** CFOSME staff read every client through their role. That
+is deliberate: if staff were granted each client one at a time, every new client
+would need granting again to everyone, and would be invisible until someone
+remembered.
 
 ---
 
@@ -181,11 +199,38 @@ this when a client's own people are to be given access.
 2. If the client is not listed (no tasks imported yet), use **Add a client**.
    The **Client name must match the workbook's Client column exactly**, because
    that is what imports match on. A mismatch creates a second client.
-3. Use **Add a login**: the person's name, e-mail, and whether they may edit
-   (Client administrator) or only look (Viewer).
+3. Use **Add a login**: the person's name and e-mail. Give them a first client
+   and a level now, or leave the client as *None* and grant clients afterwards —
+   which is the right order for someone who will cover several.
 4. A **temporary password is shown once**. Send it over a different channel from
    the e-mail address — not in the same message. They must change it at first
    sign-in.
+5. Open **Manage access** on their row to add the rest of their clients.
+
+### Managing someone's access
+
+**Clients & logins → Manage access** on a person shows everything about that
+account in one place:
+
+- **Client access** — every client they hold, at what level, when it was granted
+  and by whom. Switch a client between *View only* and *Can edit*, or remove it.
+- **Grant a client** — add one more.
+- **Everything at once** — grant every active client at one level, for someone who
+  covers the whole book. This is a **snapshot**: clients onboarded later are *not*
+  added automatically. There is also a *Remove all access*, which strips every
+  client and signs them out.
+- **Active sessions** — where they are currently signed in, with a way to end one
+  or all of them.
+- **Password and account** — reset the password, or deactivate the account.
+- **Role** — promote to CFOSME staff, or demote. Promoting removes the per-client
+  grants as redundant; demoting therefore leaves the account with **no access at
+  all** until you grant some.
+
+A revoked client stops being visible on that person's **next page load**. You do
+not have to wait for their session to expire, and you do not have to sign them out.
+
+The logins list flags an active account with **no access granted**, because an
+account that can sign in and see nothing is a setup someone forgot to finish.
 
 ### Suspending a client
 
@@ -203,6 +248,9 @@ access.
   reset.
 - **Reset password** issues a new temporary password and signs that person out
   everywhere.
+- **Sign out everywhere** ends every session without changing the password — the
+  right tool for a lost laptop.
+- Changing someone's **role** signs them out, because what they can see changes.
 - **Deactivate** blocks a login and signs them out. Use it the day someone
   leaves. You cannot deactivate your own account.
 - A session ends after **12 hours** regardless, or **2 hours** of inactivity.
@@ -260,6 +308,9 @@ leave *given what is already selected*. An option showing 0 is a dead end.
 | Overdue looks too high | Expected — see §2, item 3. Verify a few against the workbook. |
 | Due dates are all one day out | Tell a developer, and say which timezone the machine is in. |
 | Someone cannot sign in | Check the login is Active and not Locked under Clients & logins. Reset the password if needed. |
+| Someone signs in to an empty dashboard | They have no clients granted. Open Manage access and grant some. The logins list flags this as "No access granted". |
+| Someone cannot edit a task they should | Their grant for that client is *View only*. Switch it to *Can edit* on their access page. |
+| A client vanished from someone's view | Either the grant was revoked, or the client was suspended — a suspended client drops out for everyone. |
 | A figure on the dashboard disagrees with the register | It cannot — every figure is computed from the register on each load. Reload; if it persists, tell a developer. |
 
 ---
@@ -281,6 +332,9 @@ leave *given what is already selected*. An option showing 0 is a dead end.
 - Don't send a temporary password in the same message as the e-mail address.
 - Don't share one login between people — the history is only useful if it names
   the person who made the change.
+- Don't make someone CFOSME staff so they can see a few more clients. Grant the
+  clients instead; staff can also change every client's data and read the audit log.
+- Don't assume *Grant every client* keeps up with new clients. It does not.
 - Don't assume an unfinished task is overdue. Check its due date.
 
 ---

@@ -2,10 +2,12 @@
 //
 // Design notes
 // ────────────
-// 1. Multi-tenant. Every business row carries `clientId`; the session pins the
-//    tenant and all queries are scoped by it (see src/lib/tasks/scope.ts).
-//    CFOSME staff are PLATFORM_ADMIN and read across every client, which is
-//    what the executive dashboard's cross-client comparisons need.
+// 1. Multi-tenant. Every business row carries `clientId`, and every read is
+//    filtered to the clients the caller has been granted — see ClientAccess and
+//    src/lib/tasks/scope.ts. CFOSME staff are PLATFORM_ADMIN and read across
+//    every client, which is what the dashboard's cross-client comparisons need;
+//    everyone else sees exactly the clients on their grant list, at the level
+//    each grant gives them.
 // 2. Credentials live here, hashed with bcrypt — never in a config file.
 // 3. Sessions are server-side and revocable: the cookie holds an opaque token,
 //    the database stores only its SHA-256 hash.
@@ -44,31 +46,49 @@ model Client {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users     User[]
   tasks     Task[]
   auditLogs AuditLog[]
+  access    ClientAccess[]
 
   @@index([isActive])
 }
 
+/// What an account is, as distinct from what it can see.
+///
+/// Only two, because only two things are actually being decided here: whether
+/// somebody administers the portal, or whether they are simply a person with
+/// access to some clients. Which clients, and whether they may edit them, is not
+/// a property of the account — it is a list of grants (see ClientAccess), which
+/// is the whole point of the change away from CLIENT_ADMIN and VIEWER.
 enum Role {
-  /// CFOSME staff: cross-tenant access, may manage clients, logins and imports.
+  /// CFOSME staff who run the portal: every client, plus clients, logins and imports.
   PLATFORM_ADMIN
-  /// Client-side administrator: full access to their own tenant.
-  CLIENT_ADMIN
-  /// Client-side read-only viewer.
-  VIEWER
+  /// Anyone else. Sees exactly the clients granted to them, at the level granted.
+  MEMBER
+}
+
+/// How much a grant allows.
+enum AccessLevel {
+  /// Read the register and the dashboard.
+  VIEW
+  /// Also move tasks — set a status, drag progress.
+  EDIT
 }
 
 /// A portal login.
+///
+/// Deliberately carries no `clientId`. It used to, which made "one person, one
+/// client" a fact of the schema: a CFOSME reviewer covering four clients needed
+/// four accounts, and a client's finance lead who should see one entity read-only
+/// and another read-write could not be expressed at all. Visibility now lives
+/// entirely in `access`, so there is one place to read it and one place to change
+/// it.
 model User {
   id           String  @id @default(cuid())
-  /// Null for PLATFORM_ADMIN accounts, which are not bound to one tenant.
-  clientId     String?
   email        String  @unique
   name         String
   passwordHash String
-  role         Role    @default(VIEWER)
+  role         Role    @default(MEMBER)
   isActive     Boolean @default(true)
 
   /// Brute-force protection.
@@ -81,15 +101,44 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  client       Client?      @relation(fields: [clientId], references: [id], onDelete: Cascade)
   sessions     Session[]
   auditLogs    AuditLog[]
   taskEvents   TaskEvent[]
   taskImports  TaskImport[]
-  tasksTouched Task[]       @relation("TaskLastUpdatedBy")
+  tasksTouched Task[]         @relation("TaskLastUpdatedBy")
+  access       ClientAccess[]
+  grantsMade   ClientAccess[] @relation("ClientAccessGrantedBy")
 
-  @@index([clientId])
   @@index([email])
+}
+
+/// One person's access to one client.
+///
+/// The join table that replaces `User.clientId`. Every non-administrator read is
+/// filtered to the clients listed here for that user, and `level` decides whether
+/// they may move a task — per client, so the same person can be read-write on one
+/// and read-only on another.
+///
+/// `grantedById` and `createdAt` are kept because access is the thing people ask
+/// about after the fact: who gave this person sight of this client, and when.
+model ClientAccess {
+  id       String      @id @default(cuid())
+  userId   String
+  clientId String
+  level    AccessLevel @default(VIEW)
+
+  grantedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client    Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  grantedBy User?  @relation("ClientAccessGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  /// One grant per person per client — the level is a field, not a second row.
+  @@unique([userId, clientId])
+  @@index([userId])
+  @@index([clientId])
 }
 
 /// Server-side session. The cookie carries a random token; only its SHA-256

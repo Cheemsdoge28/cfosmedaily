@@ -42,22 +42,30 @@ import { cn } from "@/lib/utils";
  *               the row itself, because a toast at the edge of a 90-row table is
  *               nowhere near the row that failed.
  *
- *   read-only   a viewer's controls are disabled, and the server checks again
- *               anyway. The disabled attribute is a courtesy, not the gate.
+ *   read-only   the controls are disabled on rows whose client this reader holds
+ *               no EDIT grant for — which can be some rows and not others — and
+ *               the server checks again on every write. The disabled attribute is
+ *               a courtesy, not the gate.
  */
 
 type Editable = { status: TaskStatus; progress: number };
 
 export function RegisterTable({
   tasks,
-  canEdit,
+  editableClientIds,
   showClient,
 }: {
   tasks: TaskRow[];
-  canEdit: boolean;
-  /** Hidden for a client login, whose every row is their own company. */
+  /**
+   * The clients this reader may edit, or null for all of them. Per client, not
+   * per account: the same person can hold EDIT on one and VIEW on another, so
+   * two rows of this table can legitimately differ.
+   */
+  editableClientIds: string[] | null;
+  /** Hidden when every row is the same company. */
   showClient: boolean;
 }) {
+  const editable = editableClientIds ? new Set(editableClientIds) : null;
   if (tasks.length === 0) {
     return (
       <div className="px-5 py-14 text-center text-sm text-muted-foreground">
@@ -86,7 +94,7 @@ export function RegisterTable({
             <TaskRowCells
               key={task.id}
               task={task}
-              canEdit={canEdit}
+              canEdit={editable === null || editable.has(task.clientId)}
               showClient={showClient}
             />
           ))}

@@ -21,12 +21,32 @@ export function importResultLabel(status: string): string {
 
 const ROLES: Record<string, string> = {
   PLATFORM_ADMIN: "CFOSME staff",
-  CLIENT_ADMIN: "Client administrator",
-  VIEWER: "Viewer — read-only",
+  MEMBER: "Member",
 };
 
 export function roleLabel(role: string): string {
   return ROLES[role] ?? role;
+}
+
+const ACCESS_LEVELS: Record<string, string> = {
+  VIEW: "View only",
+  EDIT: "Can edit",
+};
+
+export function accessLevelLabel(level: string): string {
+  return ACCESS_LEVELS[level] ?? level;
+}
+
+/**
+ * What an account can reach, in one phrase.
+ *
+ * A platform admin's reach comes from their role and does not change as clients
+ * are added, so it is stated rather than counted.
+ */
+export function reachLabel(role: string, grantCount: number): string {
+  if (role === "PLATFORM_ADMIN") return "Every client";
+  if (grantCount === 0) return "No clients yet";
+  return `${grantCount} ${grantCount === 1 ? "client" : "clients"}`;
 }
 
 const CHANGE_SOURCES: Record<string, string> = {
@@ -55,6 +75,9 @@ const AUDIT_ACTIONS: Record<string, string> = {
   "user.update": "Login updated",
   "user.deactivate": "Login deactivated",
   "user.password.reset": "Password reset",
+  "access.grant": "Client access granted",
+  "access.update": "Client access changed",
+  "access.revoke": "Client access revoked",
   "task.update": "Task moved",
   "import.start": "Import started",
   "import.success": "Import finished",

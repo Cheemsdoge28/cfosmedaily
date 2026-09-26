@@ -81,7 +81,9 @@ export async function GET(request: NextRequest) {
   await recordAudit({
     action: "export.download",
     userId: scope.user.id,
-    clientId: scope.pinnedClientId,
+    // Named only when the export was one client's; a multi-client download is
+    // recorded against the practice, with its row count as the detail.
+    clientId: params.get("client") || null,
     detail: `${tasks.length} tasks`,
   });
 

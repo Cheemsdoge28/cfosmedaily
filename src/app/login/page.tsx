@@ -21,14 +21,14 @@ export default async function LoginPage() {
   const user = await getSessionUser();
   if (user) {
     redirect(
-      user.role === "PLATFORM_ADMIN" && !user.clientId ? "/admin" : "/dashboard",
+      "/dashboard",
     );
   }
 
   return (
     <AuthCard
       title="Client sign in"
-      description="Secure access to your CFO dashboard."
+      description="Secure access to your task register."
       footer={
         <Note>
           Access is restricted to authorised users. If you need

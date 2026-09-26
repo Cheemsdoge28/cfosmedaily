@@ -30,9 +30,15 @@ export default async function PortalLayout({
       defaultOpen={sidebarOpen}
       user={{
         name: user.name,
-        clientName: user.clientName,
+        // What the header says beneath the product name. A member with one client
+        // sees its name; with several, a count; staff see the practice.
+        scope: user.isPlatformAdmin
+          ? "CFOSME"
+          : user.grants.length === 1
+            ? user.grants[0]!.name
+            : `${user.grants.length} clients`,
         role: user.role,
-        isPlatformAdmin: user.role === "PLATFORM_ADMIN",
+        isPlatformAdmin: user.isPlatformAdmin,
       }}
     >
       {children}

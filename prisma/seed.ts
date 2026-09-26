@@ -204,13 +204,15 @@ async function main() {
   // second run simply did not work.
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@cfosme.test";
   const clientEmail = "finance@benchmark.test";
+  const reviewerEmail = "reviewer@cfosme.test";
   const demoClient = clientNames[0]!;
 
   async function ensureUser(input: {
     email: string;
     name: string;
-    role: "PLATFORM_ADMIN" | "CLIENT_ADMIN";
-    clientId?: string;
+    role: "PLATFORM_ADMIN" | "MEMBER";
+    /** The clients to grant, and at what level. Empty for CFOSME staff. */
+    grants?: { clientId: string; level: "VIEW" | "EDIT" }[];
     password: string;
     passwordWasGiven: boolean;
   }): Promise<string> {
@@ -226,9 +228,13 @@ async function main() {
         email: input.email,
         name: input.name,
         role: input.role,
-        clientId: input.clientId,
         passwordHash: await bcrypt.hash(input.password, 12),
         mustChangePassword: !input.passwordWasGiven,
+        // Access is a grant per client, not a column on the account. A platform
+        // admin gets none: they read every client through the role.
+        access: input.grants?.length
+          ? { create: input.grants }
+          : undefined,
       },
     });
 
@@ -245,22 +251,46 @@ async function main() {
     passwordWasGiven: Boolean(process.env.SEED_ADMIN_PASSWORD),
   });
 
-  // One client login too, so the narrowed view a client sees can be checked
-  // without creating an account by hand.
+  // Two member logins, so both halves of the access model can be checked without
+  // creating accounts by hand:
+  //
+  //   one client, editable   what a client's own finance lead sees
+  //   two clients, mixed     a CFOSME reviewer who covers a couple of clients and
+  //                          is read-only on one of them — the case the old
+  //                          one-client-per-account shape could not express
   const clientResult = await ensureUser({
     email: clientEmail,
     name: `${demoClient} Finance`,
-    role: "CLIENT_ADMIN",
-    clientId: clientIds.get(demoClient)!,
+    role: "MEMBER",
+    grants: [{ clientId: clientIds.get(demoClient)!, level: "EDIT" }],
     password: process.env.SEED_CLIENT_PASSWORD || strongPassword(),
     passwordWasGiven: Boolean(process.env.SEED_CLIENT_PASSWORD),
+  });
+
+  const secondClient = clientNames[1] ?? demoClient;
+  const reviewerResult = await ensureUser({
+    email: reviewerEmail,
+    name: "CFOSME Reviewer",
+    role: "MEMBER",
+    grants: [
+      { clientId: clientIds.get(demoClient)!, level: "EDIT" },
+      ...(secondClient !== demoClient
+        ? [{ clientId: clientIds.get(secondClient)!, level: "VIEW" as const }]
+        : []),
+    ],
+    password: process.env.SEED_REVIEWER_PASSWORD || strongPassword(),
+    passwordWasGiven: Boolean(process.env.SEED_REVIEWER_PASSWORD),
   });
 
   console.log("\n  Accounts");
   console.log(`    CFOSME staff  : ${adminEmail}`);
   console.log(`                    ${adminResult}`);
-  console.log(`    client login  : ${clientEmail}  (${demoClient})`);
+  console.log(`    client login  : ${clientEmail}  (${demoClient}, can edit)`);
   console.log(`                    ${clientResult}`);
+  console.log(
+    `    reviewer      : ${reviewerEmail}  (${demoClient} can edit, ${secondClient} view only)`,
+  );
+  console.log(`                    ${reviewerResult}`);
   console.log(
     "\n    A newly created password is shown once and must be changed at first",
   );

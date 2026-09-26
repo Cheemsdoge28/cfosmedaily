@@ -53,16 +53,17 @@ export async function loginAction(
 
   const { email, password } = parsed.data;
 
-  const user = await prisma.user.findUnique({
-    where: { email },
-    include: { client: true },
-  });
+  const user = await prisma.user.findUnique({ where: { email } });
 
   // Always run a bcrypt comparison so timing does not leak account existence.
   const hash = user?.passwordHash ?? DUMMY_HASH;
   const passwordMatches = await verifyPassword(password, hash);
 
-  if (!user || !user.isActive || (user.client && !user.client.isActive)) {
+  // A suspended client no longer blocks a sign-in, because an account is not
+  // owned by one: it is blocked from *seeing* that client, which the grant join
+  // in getSessionUser does. Someone with two clients, one suspended, should still
+  // be able to sign in and work on the other.
+  if (!user || !user.isActive) {
     await recordAudit({
       action: "auth.login.failure",
       detail: `unknown or inactive account: ${email}`,
@@ -71,11 +72,7 @@ export async function loginAction(
   }
 
   if (user.lockedUntil && user.lockedUntil > new Date()) {
-    await recordAudit({
-      action: "auth.login.locked",
-      userId: user.id,
-      clientId: user.clientId,
-    });
+    await recordAudit({ action: "auth.login.locked", userId: user.id });
     return {
       error: `This account is temporarily locked after too many failed attempts. Try again in ${LOCKOUT_MINUTES} minutes.`,
     };
@@ -98,7 +95,6 @@ export async function loginAction(
     await recordAudit({
       action: shouldLock ? "auth.login.locked" : "auth.login.failure",
       userId: user.id,
-      clientId: user.clientId,
       detail: `failed attempt ${failedLoginCount}`,
     });
 
@@ -115,13 +111,12 @@ export async function loginAction(
   });
 
   await createSession(user.id);
-  await recordAudit({
-    action: "auth.login.success",
-    userId: user.id,
-    clientId: user.clientId,
-  });
+  await recordAudit({ action: "auth.login.success", userId: user.id });
 
-  redirect(user.role === "PLATFORM_ADMIN" && !user.clientId ? "/admin" : "/dashboard");
+  // Everyone lands on the dashboard. Staff used to be sent to /admin because
+  // they had no client of their own and the dashboard had nothing to show them;
+  // it now reads across every client, so it is the right first screen for them too.
+  redirect("/dashboard");
 }
 
 export async function logoutAction(): Promise<void> {
@@ -129,11 +124,7 @@ export async function logoutAction(): Promise<void> {
   await destroySession();
 
   if (user) {
-    await recordAudit({
-      action: "auth.logout",
-      userId: user.id,
-      clientId: user.clientId,
-    });
+    await recordAudit({ action: "auth.logout", userId: user.id });
   }
 
   redirect("/login");
@@ -199,11 +190,7 @@ export async function changePasswordAction(
   await revokeAllSessions(user.id);
   await createSession(user.id);
 
-  await recordAudit({
-    action: "auth.password.change",
-    userId: user.id,
-    clientId: user.clientId,
-  });
+  await recordAudit({ action: "auth.password.change", userId: user.id });
 
   return { error: null, success: true };
 }

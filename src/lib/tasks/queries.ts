@@ -167,10 +167,15 @@ export async function loadRegister(
     };
   });
 
-  // A client login's own tenant is already pinned by the query, so the client
-  // slicer must not offer anything else.
+  // A requested client that the reader holds no grant to was already ignored by
+  // `taskScopeFilter`, so the slicer must not show it as selected either.
+  const permittedClient =
+    scope.visibleClientIds === null || scope.visibleClientIds.includes(requestedClient)
+      ? requestedClient
+      : "";
+
   const selections: Record<Dimension, string> = {
-    clientId: scope.pinnedClientId ?? requestedClient,
+    clientId: permittedClient,
     owner: normalise(params.owner),
     process: normalise(params.process),
     status: normalise(params.status),
@@ -200,7 +205,9 @@ export async function loadRegister(
     processes: textOptions(all, selections, "process", (t) => t.process),
     statuses: statusOptions(all, selections),
     frequencies: frequencyOptions(all, selections),
-    clientLocked: scope.pinnedClientId !== null,
+    // Locked when there is nothing to choose between: exactly one client is
+    // visible, so a dropdown offering only that is furniture.
+    clientLocked: scope.visibleClientIds?.length === 1,
     activeCount: DIMENSIONS.filter((d) => selections[d]).length,
   };
 
@@ -377,12 +384,14 @@ export function upcoming(tasks: TaskRow[], limit = 8): TaskRow[] {
     .slice(0, limit);
 }
 
-/** Distinct values for the whole practice, for the admin screens. */
+/** Every client with its task count, for the admin screens. */
 export async function listClients() {
   return prisma.client.findMany({
     orderBy: { name: "asc" },
     include: {
-      _count: { select: { users: true, tasks: true } },
+      // `access` rather than `users`: people reach a client through a grant now,
+      // so this counts the people who can see it.
+      _count: { select: { access: true, tasks: true } },
     },
   });
 }

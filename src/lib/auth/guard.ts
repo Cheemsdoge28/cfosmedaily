@@ -29,8 +29,12 @@ export async function requirePlatformAdmin(): Promise<SessionUser> {
   return user;
 }
 
-/** May this user administer the given tenant (manage its logins)? */
-export function canAdminister(user: SessionUser, clientId: string): boolean {
-  if (user.role === "PLATFORM_ADMIN") return true;
-  return user.role === "CLIENT_ADMIN" && user.clientId === clientId;
-}
+/**
+ * `canAdminister` is gone.
+ *
+ * It answered "may this user manage this tenant", and under the old model a
+ * CLIENT_ADMIN could. Administration is now a platform-admin matter only, and
+ * what a member may *do* with a client is their grant's level — asked and
+ * answered by `canEditClient` in src/lib/tasks/scope.ts, next to the queries it
+ * guards rather than here.
+ */

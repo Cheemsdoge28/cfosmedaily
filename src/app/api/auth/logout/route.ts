@@ -25,7 +25,6 @@ export async function POST(request: NextRequest) {
     await recordAudit({
       action: "auth.logout",
       userId: user.id,
-      clientId: user.clientId,
     });
   }
 

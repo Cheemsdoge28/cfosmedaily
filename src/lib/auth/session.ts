@@ -4,7 +4,7 @@ import { cookies, headers } from "next/headers";
 
 import { randomToken, sha256 } from "@/lib/crypto";
 import { prisma } from "@/lib/db";
-import type { Role } from "@/generated/prisma/enums";
+import type { AccessLevel, Role } from "@/generated/prisma/enums";
 
 /**
  * Server-side sessions.
@@ -24,14 +24,27 @@ const IDLE_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 /** Only touch `lastSeenAt` every few minutes to avoid a write per request. */
 const TOUCH_INTERVAL_MS = 5 * 60 * 1000;
 
+/** One client this reader may see, and what they may do with it. */
+export type GrantedClient = {
+  id: string;
+  name: string;
+  slug: string;
+  level: AccessLevel;
+};
+
 export type SessionUser = {
   id: string;
   email: string;
   name: string;
   role: Role;
-  clientId: string | null;
-  clientName: string | null;
-  clientSlug: string | null;
+  /** True for CFOSME staff, who read every client by role rather than by grant. */
+  isPlatformAdmin: boolean;
+  /**
+   * The clients granted to this account, in name order. Empty for a platform
+   * admin, whose reach comes from the role — resolving it to a list here would
+   * mean a client added tomorrow was invisible until they signed in again.
+   */
+  grants: GrantedClient[];
   mustChangePassword: boolean;
 };
 
@@ -80,7 +93,22 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 
   const session = await prisma.session.findUnique({
     where: { tokenHash: sha256(token) },
-    include: { user: { include: { client: true } } },
+    include: {
+      user: {
+        include: {
+          // Read on every request, deliberately. Grants are the authorisation
+          // boundary, so a revoked one has to take effect on the caller's next
+          // page load rather than whenever their session happens to expire.
+          // Suspended clients are filtered out here, so a suspended client
+          // simply stops appearing for everyone at once.
+          access: {
+            where: { client: { isActive: true } },
+            include: { client: { select: { id: true, name: true, slug: true } } },
+            orderBy: { client: { name: "asc" } },
+          },
+        },
+      },
+    },
   });
 
   if (!session || session.revokedAt) return null;
@@ -99,7 +127,6 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   }
 
   if (!session.user.isActive) return null;
-  if (session.user.client && !session.user.client.isActive) return null;
 
   if (now - session.lastSeenAt.getTime() > TOUCH_INTERVAL_MS) {
     await prisma.session.update({
@@ -114,9 +141,13 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     email: user.email,
     name: user.name,
     role: user.role,
-    clientId: user.clientId,
-    clientName: user.client?.name ?? null,
-    clientSlug: user.client?.slug ?? null,
+    isPlatformAdmin: user.role === "PLATFORM_ADMIN",
+    grants: user.access.map((grant) => ({
+      id: grant.client.id,
+      name: grant.client.name,
+      slug: grant.client.slug,
+      level: grant.level,
+    })),
     mustChangePassword: user.mustChangePassword,
   };
 }

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import {
   ClientActiveToggle,
   CreateClientForm,
   CreateUserForm,
-  UserRowActions,
 } from "@/app/(portal)/admin/admin-forms";
 import {
   Badge,
@@ -19,7 +19,7 @@ import {
   Th,
   Tr,
 } from "@/components/ui/primitives";
-import { roleLabel } from "@/lib/admin/labels";
+import { accessLevelLabel, reachLabel, roleLabel } from "@/lib/admin/labels";
 import { requirePlatformAdmin } from "@/lib/auth/guard";
 import { prisma } from "@/lib/db";
 import { formatDateTime, formatPercent } from "@/lib/tasks/format";
@@ -33,13 +33,18 @@ export default async function AdminPage() {
     prisma.client.findMany({
       orderBy: { name: "asc" },
       include: {
-        _count: { select: { users: true, tasks: true } },
+        _count: { select: { tasks: true, access: true } },
         tasks: { select: { status: true, progress: true } },
       },
     }),
     prisma.user.findMany({
-      orderBy: [{ client: { name: "asc" } }, { name: "asc" }],
-      include: { client: { select: { name: true } } },
+      orderBy: [{ role: "asc" }, { name: "asc" }],
+      include: {
+        access: {
+          select: { level: true, client: { select: { name: true } } },
+          orderBy: { client: { name: "asc" } },
+        },
+      },
     }),
   ]);
 
@@ -47,7 +52,7 @@ export default async function AdminPage() {
     <div className="mx-auto w-full max-w-[96rem]">
       <PageHeading
         title="Clients & logins"
-        description="Every company on the portal, and who can sign in to each. Anything you change here is recorded in the audit log."
+        description="Every company on the portal and everyone who can sign in. Access is granted per client, per person — open a login to manage it. Anything you change here is recorded in the audit log."
         meta={`${clients.length} clients · ${users.length} logins`}
       />
       <Stack>
@@ -67,7 +72,7 @@ export default async function AdminPage() {
                     <Th grow>Client</Th>
                     <Th align="right">Tasks</Th>
                     <Th align="right">Completion</Th>
-                    <Th align="right">Logins</Th>
+                    <Th align="right">People with access</Th>
                     <Th>Status</Th>
                     <Th />
                   </Tr>
@@ -86,7 +91,9 @@ export default async function AdminPage() {
                     return (
                       <Tr key={client.id}>
                         <Td>
-                          <span className="font-semibold text-heading">{client.name}</span>
+                          <span className="font-semibold text-heading">
+                            {client.name}
+                          </span>
                           <br />
                           <span className="text-xs text-muted-foreground">
                             {client.slug}
@@ -97,14 +104,17 @@ export default async function AdminPage() {
                         <Td align="right">
                           {client.tasks.length ? formatPercent(completion) : "—"}
                         </Td>
-                        <Td align="right">{client._count.users}</Td>
+                        <Td align="right">
+                          {/* Staff are not counted: they read every client by
+                              role, so a number here would be the same on every
+                              row and would say nothing about this one. */}
+                          {client._count.access}
+                        </Td>
                         <Td>
                           {!client.isActive ? (
                             <Badge tone="bad">Suspended</Badge>
                           ) : client._count.tasks === 0 ? (
                             <Badge tone="warn">No tasks yet</Badge>
-                          ) : client._count.users === 0 ? (
-                            <Badge tone="neutral">No logins</Badge>
                           ) : (
                             <Badge tone="good">Live</Badge>
                           )}
@@ -126,7 +136,7 @@ export default async function AdminPage() {
 
         <Card
           title="Logins"
-          description="CFOSME staff read every client. A client's own people see only their register."
+          description="CFOSME staff read every client. Everyone else sees exactly the clients granted to them."
         >
           {users.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
@@ -138,67 +148,114 @@ export default async function AdminPage() {
                 <THead>
                   <Tr>
                     <Th grow>Person</Th>
-                    <Th>Client</Th>
-                    <Th>Access</Th>
+                    <Th>Role</Th>
+                    <Th>Can see</Th>
                     <Th>Last signed in</Th>
                     <Th>Status</Th>
                     <Th />
                   </Tr>
                 </THead>
                 <TBody>
-                  {users.map((user) => (
-                    <Tr key={user.id}>
-                      <Td>
-                        <span className="font-semibold text-heading">{user.name}</span>
-                        {user.id === admin.id && (
-                          <span className="ms-2 text-xs text-muted-foreground">(you)</span>
-                        )}
-                        <br />
-                        <span className="text-xs text-muted-foreground">{user.email}</span>
-                      </Td>
-                      <Td className="text-muted-foreground">
-                        {user.client?.name ?? "CFOSME"}
-                      </Td>
-                      <Td className="text-muted-foreground">{roleLabel(user.role)}</Td>
-                      <Td className="whitespace-nowrap text-muted-foreground">
-                        {formatDateTime(user.lastLoginAt)}
-                      </Td>
-                      <Td>
-                        {!user.isActive ? (
-                          <Badge tone="bad">Deactivated</Badge>
-                        ) : user.lockedUntil && user.lockedUntil > new Date() ? (
-                          <Badge tone="warn">Locked</Badge>
-                        ) : user.mustChangePassword ? (
-                          <Badge tone="warn">Must change password</Badge>
-                        ) : (
-                          <Badge tone="good">Active</Badge>
-                        )}
-                      </Td>
-                      <Td>
-                        {user.role === "PLATFORM_ADMIN" ? (
+                  {users.map((user) => {
+                    const editable = user.access.filter(
+                      (grant) => grant.level === "EDIT",
+                    ).length;
+
+                    return (
+                      <Tr key={user.id}>
+                        <Td>
+                          <Link
+                            href={`/admin/users/${user.id}`}
+                            className="font-semibold text-heading underline-offset-2 hover:underline"
+                          >
+                            {user.name}
+                          </Link>
+                          {user.id === admin.id && (
+                            <span className="ms-2 text-xs text-muted-foreground">
+                              (you)
+                            </span>
+                          )}
+                          <br />
                           <span className="text-xs text-muted-foreground">
-                            Managed outside this screen
+                            {user.email}
                           </span>
-                        ) : (
-                          <UserRowActions
-                            userId={user.id}
-                            role={user.role}
-                            isActive={user.isActive}
-                            isSelf={user.id === admin.id}
-                          />
-                        )}
-                      </Td>
-                    </Tr>
-                  ))}
+                        </Td>
+                        <Td className="text-muted-foreground">
+                          {roleLabel(user.role)}
+                        </Td>
+                        <Td>
+                          <span className="text-foreground">
+                            {reachLabel(user.role, user.access.length)}
+                          </span>
+                          {user.role !== "PLATFORM_ADMIN" &&
+                            user.access.length > 0 && (
+                              <>
+                                <br />
+                                <span
+                                  className="text-xs text-muted-foreground"
+                                  // The full list, for an account with more
+                                  // clients than a cell can show.
+                                  title={user.access
+                                    .map(
+                                      (grant) =>
+                                        `${grant.client.name} — ${accessLevelLabel(grant.level)}`,
+                                    )
+                                    .join("\n")}
+                                >
+                                  {editable === 0
+                                    ? "all view only"
+                                    : editable === user.access.length
+                                      ? "all editable"
+                                      : `${editable} editable`}
+                                </span>
+                              </>
+                            )}
+                        </Td>
+                        <Td className="whitespace-nowrap text-muted-foreground">
+                          {formatDateTime(user.lastLoginAt)}
+                        </Td>
+                        <Td>
+                          {!user.isActive ? (
+                            <Badge tone="bad">Deactivated</Badge>
+                          ) : user.lockedUntil && user.lockedUntil > new Date() ? (
+                            <Badge tone="warn">Locked</Badge>
+                          ) : user.mustChangePassword ? (
+                            <Badge tone="warn">Must change password</Badge>
+                          ) : user.role !== "PLATFORM_ADMIN" &&
+                            user.access.length === 0 ? (
+                            // Active, able to sign in, and there is nothing
+                            // there — worth flagging rather than leaving to be
+                            // discovered by the person it happened to.
+                            <Badge tone="warn">No access granted</Badge>
+                          ) : (
+                            <Badge tone="good">Active</Badge>
+                          )}
+                        </Td>
+                        <Td>
+                          <Link
+                            href={`/admin/users/${user.id}`}
+                            className="text-sm font-medium text-heading underline-offset-2 hover:underline"
+                          >
+                            Manage access
+                          </Link>
+                        </Td>
+                      </Tr>
+                    );
+                  })}
                 </TBody>
               </Table>
             </TableWrap>
           )}
         </Card>
 
-        <Card title="Add a login">
+        <Card
+          title="Add a login"
+          description="One client to start with, or none — further clients are granted on the account's own page."
+        >
           <CreateUserForm
-            clients={clients.map((client) => ({ id: client.id, name: client.name }))}
+            clients={clients
+              .filter((client) => client.isActive)
+              .map((client) => ({ id: client.id, name: client.name }))}
           />
         </Card>
 

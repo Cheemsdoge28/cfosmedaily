@@ -45,7 +45,8 @@ export function PortalShell({
 }: {
   user: {
     name: string;
-    clientName: string | null;
+    /** What this reader is looking at — a client name, a count, or the practice. */
+    scope: string;
     role: string;
     isPlatformAdmin: boolean;
   };
@@ -92,7 +93,7 @@ export function PortalShell({
               Pulse Pro
             </p>
             <p className="truncate text-xs text-muted-foreground">
-              {user.clientName ?? "CFOSME"} &middot; Task Register
+              {user.scope} &middot; Task Register
             </p>
           </div>
 
@@ -137,7 +138,7 @@ export function PortalShell({
 function PortalSidebar({
   user,
 }: {
-  user: { name: string; clientName: string | null; isPlatformAdmin: boolean };
+  user: { name: string; scope: string; isPlatformAdmin: boolean };
 }) {
   const pathname = usePathname();
 
@@ -206,7 +207,7 @@ function PortalSidebar({
                   {user.name}
                 </span>
                 <span className="truncate text-xs text-sidebar-foreground/60">
-                  {user.clientName ?? "CFOSME"}
+                  {user.scope}
                 </span>
               </span>
             </SidebarMenuButton>

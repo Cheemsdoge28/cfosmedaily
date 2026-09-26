@@ -114,25 +114,25 @@ export async function createClientAction(
     : undefined;
 
   const client = await prisma.client.create({
-    data: {
-      name,
-      slug,
-      legalName: legalName || null,
-      ...(wantsLogin && passwordHash
-        ? {
-            users: {
-              create: {
-                name: adminName!,
-                email: adminEmail!,
-                role: "CLIENT_ADMIN",
-                passwordHash,
-                mustChangePassword: true,
-              },
-            },
-          }
-        : {}),
-    },
+    data: { name, slug, legalName: legalName || null },
   });
+
+  // The first login is a member holding one grant, not an account bound to the
+  // client. The binding *is* the grant, so it can be added to later.
+  if (wantsLogin && passwordHash) {
+    await prisma.user.create({
+      data: {
+        name: adminName!,
+        email: adminEmail!,
+        role: "MEMBER",
+        passwordHash,
+        mustChangePassword: true,
+        access: {
+          create: { clientId: client.id, level: "EDIT", grantedById: admin.id },
+        },
+      },
+    });
+  }
 
   await recordAudit({
     action: "client.create",
@@ -146,7 +146,7 @@ export async function createClientAction(
       action: "user.create",
       userId: admin.id,
       clientId: client.id,
-      detail: `${adminEmail} as CLIENT_ADMIN (created with client)`,
+      detail: `${adminEmail} created with the client, granted Can edit on it`,
     });
   }
 
@@ -176,13 +176,16 @@ export async function toggleClientActiveAction(
   const isActive = !client.isActive;
   await prisma.client.update({ where: { id: clientId }, data: { isActive } });
 
-  // Suspending a client must not leave its people holding live sessions.
+  // Suspending a client must not leave its people holding live sessions. They are
+  // found through the grant table now. A suspended client also drops out of
+  // getSessionUser, so anyone with no other client sees an empty register rather
+  // than stale figures.
   if (!isActive) {
-    const users = await prisma.user.findMany({
+    const grants = await prisma.clientAccess.findMany({
       where: { clientId },
-      select: { id: true },
+      select: { userId: true },
     });
-    for (const user of users) await revokeAllSessions(user.id);
+    for (const grant of grants) await revokeAllSessions(grant.userId);
   }
 
   await recordAudit({
@@ -204,10 +207,15 @@ export async function toggleClientActiveAction(
 // ─────────────────────────────────────────────────────────────────────────────
 
 const userSchema = z.object({
-  clientId: z.string().min(1, "Choose a client."),
   name: z.string().trim().min(2, "Enter the person's name."),
   email: z.string().trim().toLowerCase().email("Enter a valid e-mail address."),
-  role: z.enum(["CLIENT_ADMIN", "VIEWER"]),
+  /**
+   * The first client and its level, both optional: an account can be created now
+   * and granted its clients afterwards on its own page, which is how a reviewer
+   * covering several clients is set up.
+   */
+  clientId: z.string().optional(),
+  level: z.enum(["VIEW", "EDIT"]).default("VIEW"),
 });
 
 export async function createUserAction(
@@ -217,10 +225,10 @@ export async function createUserAction(
   const admin = await requirePlatformAdmin();
 
   const parsed = userSchema.safeParse({
-    clientId: formData.get("clientId"),
     name: formData.get("name"),
     email: formData.get("email"),
-    role: formData.get("role"),
+    clientId: formData.get("clientId"),
+    level: formData.get("level") ?? "VIEW",
   });
 
   if (!parsed.success) return fail(parsed.error.issues[0]!.message);
@@ -229,71 +237,61 @@ export async function createUserAction(
     return fail("That e-mail already has an account.");
   }
 
+  // "none" is the sentinel the form uses for "grant the clients later", because a
+  // select cannot carry an empty value.
+  const firstClient =
+    parsed.data.clientId && parsed.data.clientId !== "none"
+      ? parsed.data.clientId
+      : null;
+
+  if (firstClient) {
+    const exists = await prisma.client.findUnique({
+      where: { id: firstClient },
+      select: { id: true },
+    });
+    if (!exists) return fail("That client no longer exists.");
+  }
+
   const temporaryPassword = generateTemporaryPassword();
 
   const user = await prisma.user.create({
     data: {
-      clientId: parsed.data.clientId,
       name: parsed.data.name,
       email: parsed.data.email,
-      role: parsed.data.role,
+      role: "MEMBER",
       passwordHash: await hashPassword(temporaryPassword),
       mustChangePassword: true,
+      ...(firstClient
+        ? {
+            access: {
+              create: {
+                clientId: firstClient,
+                level: parsed.data.level,
+                grantedById: admin.id,
+              },
+            },
+          }
+        : {}),
     },
   });
 
   await recordAudit({
     action: "user.create",
     userId: admin.id,
-    clientId: parsed.data.clientId,
-    detail: `${parsed.data.email} as ${parsed.data.role}`,
+    clientId: firstClient,
+    detail: firstClient
+      ? `${parsed.data.email} created with ${parsed.data.level} on one client`
+      : `${parsed.data.email} created with no client access yet`,
   });
 
   revalidatePath("/admin");
 
   return {
     error: null,
-    success: `Login created for ${user.email}. Share the temporary password over a secure channel — it is shown only once.`,
+    success: firstClient
+      ? `Login created for ${user.email}. Share the temporary password over a secure channel — it is shown only once. Add further clients on their access page.`
+      : `Login created for ${user.email}, with no client access yet. Grant the clients they need on their access page. The temporary password is shown only once.`,
     temporaryPassword,
-  };
-}
-
-/** Promotes a viewer to client administrator, or demotes one. */
-export async function updateUserRoleAction(
-  _prev: AdminState,
-  formData: FormData,
-): Promise<AdminState> {
-  const admin = await requirePlatformAdmin();
-
-  const userId = String(formData.get("userId") ?? "");
-  const role = String(formData.get("role") ?? "");
-
-  if (role !== "CLIENT_ADMIN" && role !== "VIEWER") {
-    return fail("Choose a valid role.");
-  }
-
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) return fail("That user no longer exists.");
-  if (user.role === "PLATFORM_ADMIN") {
-    return fail("CFOSME staff accounts cannot be changed here.");
-  }
-
-  await prisma.user.update({ where: { id: userId }, data: { role } });
-
-  await recordAudit({
-    action: "user.update",
-    userId: admin.id,
-    clientId: user.clientId,
-    detail: `${user.email} role ${user.role} -> ${role}`,
-  });
-
-  revalidatePath("/admin");
-
-  return {
-    ...INITIAL_ADMIN_STATE,
-    success: `${user.email} is now a ${
-      role === "CLIENT_ADMIN" ? "client administrator" : "viewer"
-    }.`,
   };
 }
 
@@ -327,11 +325,11 @@ export async function resetPasswordAction(
   await recordAudit({
     action: "user.password.reset",
     userId: admin.id,
-    clientId: user.clientId,
     detail: user.email,
   });
 
   revalidatePath("/admin");
+  revalidatePath(`/admin/users/${user.id}`);
 
   return {
     error: null,
@@ -361,11 +359,11 @@ export async function toggleUserActiveAction(
   await recordAudit({
     action: isActive ? "user.update" : "user.deactivate",
     userId: admin.id,
-    clientId: user.clientId,
     detail: `${user.email} -> ${isActive ? "active" : "inactive"}`,
   });
 
   revalidatePath("/admin");
+  revalidatePath(`/admin/users/${user.id}`);
 
   return {
     ...INITIAL_ADMIN_STATE,

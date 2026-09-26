@@ -13,6 +13,7 @@ import { Card, Row } from "@/components/ui/primitives";
 import { Icons } from "@/components/ui/icons";
 import { formatPercent, pluralTasks } from "@/lib/tasks/format";
 import { loadRegister, upcoming, type TaskSearchParams } from "@/lib/tasks/queries";
+import { scopeLabel } from "@/lib/tasks/scope";
 
 export const metadata: Metadata = { title: "Executive Dashboard" };
 
@@ -32,7 +33,7 @@ export default async function DashboardPage({
       description="Live view of client delivery, workload, deadlines and completion."
       filters={filters}
       totals={totals}
-      scopeLabel={scope.isPractice ? "All clients" : (scope.user.clientName ?? "Your register")}
+      scopeLabel={scopeLabel(scope)}
       action={
         <ButtonLink
           variant="outline"

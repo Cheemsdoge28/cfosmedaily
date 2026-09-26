@@ -7,6 +7,7 @@ import { Callout, Card } from "@/components/ui/primitives";
 import { Icons } from "@/components/ui/icons";
 import { pluralTasks } from "@/lib/tasks/format";
 import { loadRegister, type TaskSearchParams } from "@/lib/tasks/queries";
+import { editableClientIds, scopeLabel } from "@/lib/tasks/scope";
 
 export const metadata: Metadata = { title: "Task Register" };
 
@@ -19,9 +20,11 @@ export default async function RegisterPage({
 
   if (empty) return <NoTasksNotice canImport={scope.isPractice} />;
 
-  // Practice staff and a client's own administrator may move tasks; a viewer may
-  // not. The server checks this again on every write — see lib/tasks/actions.ts.
-  const canEdit = scope.isPractice || scope.user.role === "CLIENT_ADMIN";
+  // Which clients this reader may edit. Null means all of them. Per client
+  // rather than per account, because a member can hold EDIT on one and VIEW on
+  // another. The server checks again on every write — see lib/tasks/actions.ts.
+  const editable = editableClientIds(scope);
+  const canEditAny = editable === null || editable.size > 0;
 
   // The export carries the current view, so what downloads is what is on screen.
   const exportQuery = new URLSearchParams();
@@ -37,7 +40,7 @@ export default async function RegisterPage({
       description="Full task-level control centre. Status and progress are editable here."
       filters={filters}
       totals={totals}
-      scopeLabel={scope.isPractice ? "All clients" : (scope.user.clientName ?? "Your register")}
+      scopeLabel={scopeLabel(scope)}
       action={
         <ButtonLink
           variant="outline"
@@ -68,7 +71,7 @@ export default async function RegisterPage({
       <Card
         title="All tasks"
         description={
-          canEdit
+          canEditAny
             ? "Sorted with overdue work first, then by due date"
             : "Sorted with overdue work first, then by due date · read-only for your account"
         }
@@ -81,8 +84,10 @@ export default async function RegisterPage({
       >
         <RegisterTable
           tasks={sortForRegister(tasks)}
-          canEdit={canEdit}
-          showClient={!scope.pinnedClientId}
+          editableClientIds={editable ? [...editable] : null}
+          // One visible client means every row names the same company, so the
+          // column would be the same word ninety times over.
+          showClient={filters.clients.length !== 1}
         />
       </Card>
     </ModuleFrame>

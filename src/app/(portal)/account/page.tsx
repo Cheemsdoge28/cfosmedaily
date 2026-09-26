@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { ChangePasswordForm } from "@/app/(portal)/account/change-password-form";
 import {
+  Badge,
   Card,
   Detail,
   Note,
@@ -41,10 +42,49 @@ export default async function AccountPage() {
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
             <Detail label="Name" value={user.name} />
             <Detail label="E-mail" value={user.email} />
-            <Detail label="Client" value={user.clientName ?? "CFOSME"} />
             <Detail label="Role" value={ROLE_LABELS[user.role] ?? user.role} />
+            <Detail
+              label="Clients you can see"
+              value={
+                user.isPlatformAdmin
+                  ? "Every client on the portal"
+                  : user.grants.length === 0
+                    ? "None yet — ask CFOSME to grant access"
+                    : `${user.grants.length}`
+              }
+            />
           </dl>
         </Card>
+
+        {!user.isPlatformAdmin && (
+          <Card
+            title="Your access"
+            description="Granted by CFOSME. Ask them if something is missing."
+          >
+            {user.grants.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No clients have been granted to your account yet, so the dashboard
+                and register are empty. CFOSME grants access per client.
+              </p>
+            ) : (
+              <ul className="space-y-1.5">
+                {user.grants.map((grant) => (
+                  <li
+                    key={grant.id}
+                    className="flex items-center justify-between gap-3 text-sm"
+                  >
+                    <span className="min-w-0 truncate text-foreground">
+                      {grant.name}
+                    </span>
+                    <Badge tone={grant.level === "EDIT" ? "good" : "neutral"}>
+                      {grant.level === "EDIT" ? "Can edit" : "View only"}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        )}
 
         <Card title="Change password">
           <ChangePasswordForm />
@@ -84,7 +124,6 @@ export default async function AccountPage() {
 
 const ROLE_LABELS: Record<string, string> = {
   PLATFORM_ADMIN: "CFOSME staff — reads every client",
-  CLIENT_ADMIN: "Client administrator",
-  VIEWER: "Viewer",
+  MEMBER: "Member — sees the clients granted below",
 };
 

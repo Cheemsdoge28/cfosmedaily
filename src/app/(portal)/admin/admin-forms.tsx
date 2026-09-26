@@ -12,10 +12,7 @@ import {
 import {
   createClientAction,
   createUserAction,
-  resetPasswordAction,
   toggleClientActiveAction,
-  toggleUserActiveAction,
-  updateUserRoleAction,
 } from "@/lib/admin/actions";
 import { INITIAL_ADMIN_STATE } from "@/lib/admin/types";
 
@@ -86,7 +83,14 @@ export function CreateClientForm() {
   );
 }
 
-/** Give someone at a client a login. */
+/**
+ * Create a login.
+ *
+ * A login is no longer owned by a client, so the client field is optional: an
+ * account can be created now and granted its clients on its own page. That is
+ * the normal path for a CFOSME reviewer who covers several, and it is why this
+ * form offers one client rather than pretending there is only ever one.
+ */
 export function CreateUserForm({
   clients,
 }: {
@@ -94,49 +98,52 @@ export function CreateUserForm({
 }) {
   const [state, action] = useActionState(createUserAction, INITIAL_ADMIN_STATE);
 
-  if (clients.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Add a client first — a login has to belong to one.
-      </p>
-    );
-  }
-
   return (
     <form action={action} className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Client">
-          <SelectField
-            name="clientId"
-            ariaLabel="Client"
-            defaultValue={clients[0]!.id}
-            options={clients.map((client) => ({
-              value: client.id,
-              label: client.name,
-            }))}
-            className="w-full"
-          />
-        </Field>
-
-        <Field label="Access">
-          <SelectField
-            name="role"
-            ariaLabel="Access level"
-            defaultValue="VIEWER"
-            options={[
-              { value: "VIEWER", label: "Viewer — read-only" },
-              { value: "CLIENT_ADMIN", label: "Client administrator — may edit tasks" },
-            ]}
-            className="w-full"
-          />
-        </Field>
-
         <Field label="Full name">
           <Input name="name" required placeholder="Priya Sharma" />
         </Field>
 
         <Field label="E-mail address">
-          <Input name="email" type="email" required placeholder="finance@benchmark.example" />
+          <Input
+            name="email"
+            type="email"
+            required
+            placeholder="finance@benchmark.example"
+          />
+        </Field>
+
+        <Field
+          label="First client"
+          hint="Optional. Add more, or change the level, on their access page."
+        >
+          <SelectField
+            name="clientId"
+            ariaLabel="First client"
+            defaultValue="none"
+            options={[
+              { value: "none", label: "None — grant clients later" },
+              ...clients.map((client) => ({
+                value: client.id,
+                label: client.name,
+              })),
+            ]}
+            className="w-full"
+          />
+        </Field>
+
+        <Field label="Level for that client">
+          <SelectField
+            name="level"
+            ariaLabel="Access level"
+            defaultValue="VIEW"
+            options={[
+              { value: "VIEW", label: "View only" },
+              { value: "EDIT", label: "Can edit — may move tasks" },
+            ]}
+            className="w-full"
+          />
         </Field>
       </div>
 
@@ -146,75 +153,6 @@ export function CreateUserForm({
         <Submit label="Create login" pendingLabel="Creating…" />
       </div>
     </form>
-  );
-}
-
-/**
- * The per-row controls on the logins table.
- *
- * One form per action rather than a menu: each is a single button whose label says
- * exactly what it does, which is what you want beside a list of people's accounts.
- */
-export function UserRowActions({
-  userId,
-  role,
-  isActive,
-  isSelf,
-}: {
-  userId: string;
-  role: string;
-  isActive: boolean;
-  isSelf: boolean;
-}) {
-  const [resetState, resetAction] = useActionState(
-    resetPasswordAction,
-    INITIAL_ADMIN_STATE,
-  );
-  const [toggleState, toggleAction] = useActionState(
-    toggleUserActiveAction,
-    INITIAL_ADMIN_STATE,
-  );
-  const [roleState, roleAction] = useActionState(
-    updateUserRoleAction,
-    INITIAL_ADMIN_STATE,
-  );
-
-  const nextRole = role === "CLIENT_ADMIN" ? "VIEWER" : "CLIENT_ADMIN";
-
-  return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <form action={roleAction}>
-          <input type="hidden" name="userId" value={userId} />
-          <input type="hidden" name="role" value={nextRole} />
-          <Submit
-            label={role === "CLIENT_ADMIN" ? "Make viewer" : "Make administrator"}
-            pendingLabel="Saving…"
-            variant="outline"
-          />
-        </form>
-
-        <form action={resetAction}>
-          <input type="hidden" name="userId" value={userId} />
-          <Submit label="Reset password" pendingLabel="Resetting…" variant="outline" />
-        </form>
-
-        {!isSelf && (
-          <form action={toggleAction}>
-            <input type="hidden" name="userId" value={userId} />
-            <Submit
-              label={isActive ? "Deactivate" : "Reactivate"}
-              pendingLabel="Saving…"
-              variant={isActive ? "ghost" : "outline"}
-            />
-          </form>
-        )}
-      </div>
-
-      <Feedback state={roleState} />
-      <Feedback state={resetState} />
-      <Feedback state={toggleState} />
-    </div>
   );
 }
 

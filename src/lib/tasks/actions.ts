@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { recordAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
-import { requireTaskScope } from "@/lib/tasks/scope";
+import { canEditClient, requireTaskScope } from "@/lib/tasks/scope";
 import { statusLabel } from "@/lib/tasks/format";
 import { applyProgress, applyStatus, differs } from "@/lib/tasks/transition";
 import type { TaskStatus } from "@/generated/prisma/enums";
@@ -30,10 +30,13 @@ export type TaskMutationResult =
 /**
  * May this reader move this task?
  *
- * Practice staff may move anything. A client's own administrator may move their
- * own tasks — they are the ones doing the work being tracked. A viewer may not,
- * and the register renders their controls disabled; this is the check that makes
- * that more than a UI courtesy.
+ * Practice staff may move anything. Everyone else may move a task only where they
+ * hold an EDIT grant for *that task's client* — so the same person can be
+ * read-write on one client and read-only on another, which an account-wide role
+ * could not express.
+ *
+ * The register renders a read-only reader's controls disabled; this is the check
+ * that makes that more than a UI courtesy.
  */
 type Authorised = {
   ok: true;
@@ -65,15 +68,16 @@ async function authorise(taskId: string): Promise<Authorised | { ok: false; erro
   if (!task) return { ok: false, error: "That task no longer exists." };
 
   if (!scope.isPractice) {
-    if (scope.pinnedClientId !== task.clientId) {
+    const visible = scope.visibleClientIds?.includes(task.clientId) ?? false;
+    if (!visible) {
       // Deliberately the same message as a missing task: a reader who may not
       // see a task should not be able to learn that it exists.
       return { ok: false, error: "That task no longer exists." };
     }
-    if (scope.user.role === "VIEWER") {
+    if (!canEditClient(scope, task.clientId)) {
       return {
         ok: false,
-        error: "Your account has read-only access to the register.",
+        error: `Your access to ${task.client.name} is read-only.`,
       };
     }
   }
