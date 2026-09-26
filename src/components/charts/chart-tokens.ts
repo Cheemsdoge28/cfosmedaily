@@ -11,26 +11,27 @@ import type { TaskStatus } from "@/generated/prisma/enums";
  * therefore mirror the CSS tokens rather than referencing them, and are re-read
  * whenever the theme flips.
  *
- * Rules the chart components follow:
- *   - one y-axis, never two;
- *   - colour follows the entity, so filtering never repaints a series;
- *   - nominal categories get one hue, ordered bands get the ordinal ramp;
- *   - categorical hues are assigned in fixed order and never cycled.
- *
- * The categorical and ordinal palettes were validated against the card surface
- * with the data-viz checker:
- *
- *   series pair, light   adjacent CVD ΔE 24.7, normal-vision ΔE 33.6, both >= 3:1
- *   series pair, dark    adjacent CVD ΔE 26.8, normal-vision ΔE 31.8, both >= 3:1
- *   ordinal ramp, both   monotone lightness, adjacent ΔL >= 0.06, single hue
+ * There are exactly two palettes here, because the charts draw exactly two kinds
+ * of thing. The set carried over from the portal this was forked from also held a
+ * six-hue categorical ramp and a five-step ordinal ramp, both unused — and both
+ * carrying a comment asserting they had been validated against these surfaces.
+ * Dead values with a correctness claim on them are worse than no values, because
+ * the next person reaches for one and trusts the claim, so they are gone.
  */
 
 export type ChartPalette = {
-  series: [string, string];
-  /** Fixed categorical order. Past six, fold the tail into "Other". */
-  categorical: string[];
-  ordinal: string[];
-  /** One colour per task state. See STATUS_FILL below for why it is separate. */
+  /**
+   * Magnitude with no state attached — the Process Mix bars.
+   *
+   * Drawn from the brand's own deep teal rather than from any status hue. That
+   * is the point of it: a bar counting tasks per process means "how many", and
+   * painting it the same blue as "In progress" would quietly imply those tasks
+   * were in progress. Structural, not semantic.
+   *
+   * Light 6.0:1 on #ffffff, dark 5.5:1 on #141d2e.
+   */
+  neutralBar: string;
+  /** One colour per task state. See the note below for why it is its own set. */
   status: Record<TaskStatus, string>;
   grid: string;
   tick: string;
@@ -40,45 +41,45 @@ export type ChartPalette = {
 /**
  * The status palette.
  *
- * Deliberately not drawn from the categorical slots. A task's state is *semantic*
- * — green means finished, red means stuck — so these hues carry meaning and are
- * reserved for it; using slot 3 for "At risk" would let a later chart paint an
- * unrelated series the same amber.
+ * Reserved by meaning: green is finished, red is stuck, and these five are never
+ * reused as a series colour, or an unrelated amber bar would read as "at risk".
  *
- * That semantics constrains the palette in a way a nominal one is not: green,
- * amber and red are close in hue by definition, and "Not started" must read as
- * the absence of a state, which means grey. So it was validated on the pairlist
- * that actually matters for a donut — adjacent slices, in the order they are
- * drawn — and on that list both modes pass every check:
+ * Being semantic constrains it in a way a nominal palette is not — green, amber
+ * and red are close in hue by definition, and "Not started" has to read as the
+ * absence of a state, which means grey. So it is validated on the pairlist that
+ * actually matters for a donut: adjacent slices, in the order they are drawn. On
+ * that list both modes pass every check.
  *
- *   light, on #ffffff   adjacent CVD ΔE 19.9, normal-vision ΔE 20.9, all >= 3:1
+ *   light, on #ffffff   adjacent CVD ΔE 15.1, normal-vision ΔE 16.1, all >= 3:1
  *   dark,  on #141d2e   adjacent CVD ΔE 10.1, normal-vision ΔE 16.4, all >= 3:1
  *
  * The one check each mode fails is the chroma floor, on "Not started" alone, and
- * that failure is the intent: a grey that cleared the floor would no longer read
- * as "nothing has happened yet". Identity is never left to colour — every slice
- * is named and carries its count in the legend beside it.
+ * that failure is the intent: a grey that cleared the floor would stop reading as
+ * "nothing has happened yet". Identity is never left to colour — every slice is
+ * named and carries its count in the legend beside it.
+ *
+ * "In progress" is the brand's blue rather than the inherited one, which is what
+ * makes the charts look like they belong to this product; re-validated at that
+ * hue rather than assumed to still pass.
  */
 const STATUS_LIGHT: Record<TaskStatus, string> = {
   DONE: "#12855a",
-  IN_PROGRESS: "#2a78d6",
+  IN_PROGRESS: "#1b8ec4",
   AT_RISK: "#c08a00",
   BLOCKED: "#96201f",
   NOT_STARTED: "#8593a8",
 };
 
 const STATUS_DARK: Record<TaskStatus, string> = {
-  DONE: "#199e70",
-  IN_PROGRESS: "#2f6fd6",
+  DONE: "#17915f",
+  IN_PROGRESS: "#2f9fd0",
   AT_RISK: "#c98500",
   BLOCKED: "#cf4040",
   NOT_STARTED: "#878fa0",
 };
 
 const LIGHT: ChartPalette = {
-  series: ["#2a78d6", "#eb6834"],
-  categorical: ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#6845d8", "#e87ba4"],
-  ordinal: ["#86b6ef", "#5598e7", "#2a78d6", "#1c5cab", "#104281"],
+  neutralBar: "#1f6b84",
   status: STATUS_LIGHT,
   grid: "#eef1f5",
   tick: "#667085",
@@ -86,9 +87,7 @@ const LIGHT: ChartPalette = {
 };
 
 const DARK: ChartPalette = {
-  series: ["#3987e5", "#d95926"],
-  categorical: ["#3987e5", "#d95926", "#199e70", "#c98500", "#9085e9", "#d55181"],
-  ordinal: ["#184f95", "#256abf", "#3987e5", "#6da7ec", "#9ec5f4"],
+  neutralBar: "#4f9cb8",
   status: STATUS_DARK,
   grid: "#22304a",
   tick: "#94a3b8",
@@ -104,6 +103,7 @@ export function useChartPalette(): ChartPalette {
 /** Shared tooltip chrome, themed. */
 export function tooltipStyle(palette: ChartPalette) {
   return {
+    // --radius-md, matching the popovers and menus this sits among.
     borderRadius: 10,
     border: `1px solid ${palette.grid}`,
     background: palette.surface,

@@ -3,11 +3,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import {
+  AccessEditor,
+  type AccessRow,
+} from "@/app/(portal)/admin/users/[id]/access-editor";
+import {
   AccountForms,
-  BulkAccessForms,
-  ChangeLevelForm,
-  GrantAccessForm,
-  RevokeAccessForm,
   RoleForm,
   SessionForms,
 } from "@/app/(portal)/admin/users/[id]/access-forms";
@@ -16,7 +16,6 @@ import {
   Callout,
   Card,
   Detail,
-  Note,
   PageHeading,
   Stack,
   TBody,
@@ -28,21 +27,21 @@ import {
   Tr,
 } from "@/components/ui/primitives";
 import { ButtonLink } from "@/components/ui/button";
-import { accessLevelLabel, auditActionLabel, roleLabel } from "@/lib/admin/labels";
+import { auditActionLabel, roleLabel } from "@/lib/admin/labels";
 import { requirePlatformAdmin } from "@/lib/auth/guard";
 import { prisma } from "@/lib/db";
 import { formatDateTime } from "@/lib/tasks/format";
 
-export const metadata: Metadata = { title: "Account access" };
+export const metadata: Metadata = { title: "Account" };
 
 /**
- * One person: what they can see, what they can change, and where they are signed in.
+ * One account: what it can see, what it can change, and where it is signed in.
  *
- * This page exists because access used to be a single column on the user row, so
- * there was nothing to manage and nowhere to manage it. Now that a person can hold
- * any number of clients at either level, the questions an operator actually asks —
- * *which* clients, at what level, who granted them, is this person still signed in
- * on that laptop — each need an answer in one place.
+ * Four cards, not eight. The earlier version gave every operation its own card,
+ * which pushed the sessions list below two screenfuls of forms and made the page
+ * read as a list of things you could do rather than a description of an account.
+ * Now the shape follows the questions: what can they reach, who are they, where
+ * are they signed in, what have they done.
  */
 export default async function UserAccessPage({
   params,
@@ -74,25 +73,38 @@ export default async function UserAccessPage({
   const isPlatformAdmin = user.role === "PLATFORM_ADMIN";
   const isSelf = user.id === admin.id;
 
-  // Only clients they do not already hold are offerable, and only active ones —
-  // granting a suspended client would produce a grant that resolves to nothing.
-  const grantedIds = new Set(user.access.map((grant) => grant.clientId));
-  const availableClients = await prisma.client.findMany({
-    where: { isActive: true, id: { notIn: [...grantedIds] } },
-    select: { id: true, name: true },
+  // Every client the editor should offer: all the active ones, plus any the
+  // account already holds even if that client has since been suspended — so a
+  // dormant grant is visible and removable rather than invisible and stuck.
+  const held = new Map(user.access.map((grant) => [grant.clientId, grant]));
+  const clients = await prisma.client.findMany({
+    where: { OR: [{ isActive: true }, { id: { in: [...held.keys()] } }] },
+    select: { id: true, name: true, isActive: true },
     orderBy: { name: "asc" },
   });
 
-  // What this person has actually been doing. The audit log is global and long, so
-  // this is the slice of it that belongs to them.
+  const accessRows: AccessRow[] = clients.map((client) => {
+    const grant = held.get(client.id);
+    return {
+      clientId: client.id,
+      clientName: client.name,
+      level: grant ? grant.level : "NONE",
+      clientIsActive: client.isActive,
+      grantedByName: grant?.grantedBy?.name ?? null,
+      grantedAt: grant?.createdAt.toISOString() ?? null,
+    };
+  });
+
+  // The audit log is global and long; this is the slice belonging to them.
   const activity = await prisma.auditLog.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
-    take: 12,
+    take: 10,
     include: { client: { select: { name: true } } },
   });
 
   const editable = user.access.filter((grant) => grant.level === "EDIT").length;
+  const isLocked = Boolean(user.lockedUntil && user.lockedUntil > new Date());
 
   return (
     <div className="mx-auto w-full max-w-[96rem]">
@@ -105,12 +117,8 @@ export default async function UserAccessPage({
             : `${user.access.length} client${user.access.length === 1 ? "" : "s"} · ${editable} editable`
         }
         action={
-          <ButtonLink
-            variant="outline"
-            size="lg"
-            render={<Link href="/admin" />}
-          >
-            All logins
+          <ButtonLink variant="outline" size="lg" render={<Link href="/admin/users" />}>
+            All users
           </ButtonLink>
         }
       />
@@ -118,28 +126,60 @@ export default async function UserAccessPage({
       <Stack>
         {!user.isActive && (
           <Callout tone="bad" title="This account is deactivated">
-            They cannot sign in, and their grants below are dormant until the
+            They cannot sign in, and their access below is dormant until the
             account is reactivated.
           </Callout>
         )}
 
-        {user.mustChangePassword && user.isActive && (
-          <Callout tone="warn" title="Must set a new password">
-            They will be sent to the password screen at their next sign-in and
-            cannot reach the register until they have set one.
+        {isLocked && user.isActive && (
+          <Callout tone="warn" title="Locked after repeated failed sign-ins">
+            Locked until {formatDateTime(user.lockedUntil)}. Resetting the
+            password clears it immediately.
           </Callout>
         )}
 
+        {!isPlatformAdmin && user.access.length === 0 && user.isActive && (
+          <Callout tone="warn" title="No clients granted">
+            This account can sign in but has nothing to look at. Grant it a client
+            below.
+          </Callout>
+        )}
+
+        {/* ── What they can reach ─────────────────────────────────────────── */}
+        {isPlatformAdmin ? (
+          <Card title="Client access">
+            <p className="text-sm text-muted-foreground">
+              CFOSME staff read every client through their role, so there is
+              nothing to grant. A client onboarded tomorrow is visible to them
+              immediately — which is the reason the role does not work by granting
+              each client one at a time.
+            </p>
+          </Card>
+        ) : (
+          <Card
+            title="Client access"
+            description="Set as many clients as you like, then save once. Nothing is written until you do."
+            flush
+          >
+            <AccessEditor userId={user.id} rows={accessRows} />
+          </Card>
+        )}
+
+        {/* ── Who they are ────────────────────────────────────────────────── */}
         <Card title="Account">
           <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
             <Detail label="Role" value={roleLabel(user.role)} />
             <Detail
               label="Status"
               value={
-                user.isActive ? (
-                  <Badge tone="good">Active</Badge>
-                ) : (
+                !user.isActive ? (
                   <Badge tone="bad">Deactivated</Badge>
+                ) : isLocked ? (
+                  <Badge tone="warn">Locked</Badge>
+                ) : user.mustChangePassword ? (
+                  <Badge tone="warn">Must change password</Badge>
+                ) : (
+                  <Badge tone="good">Active</Badge>
                 )
               }
             />
@@ -147,120 +187,50 @@ export default async function UserAccessPage({
             <Detail label="Added" value={formatDateTime(user.createdAt)} />
           </dl>
 
-          {user.lockedUntil && user.lockedUntil > new Date() && (
-            <Note>
-              Locked after repeated failed sign-ins until{" "}
-              {formatDateTime(user.lockedUntil)}. Resetting the password clears it.
-            </Note>
-          )}
-        </Card>
+          <div className="mt-5 grid gap-5 border-t border-border pt-5 lg:grid-cols-2">
+            <div>
+              <h3 className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                Password and access
+              </h3>
+              <AccountForms
+                userId={user.id}
+                isActive={user.isActive}
+                isSelf={isSelf}
+              />
+            </div>
 
-        {/* ── Access ──────────────────────────────────────────────────────── */}
-        {isPlatformAdmin ? (
-          <Card title="Client access">
-            <p className="text-sm text-muted-foreground">
-              CFOSME staff read every client through their role, so there are no
-              per-client grants to manage. A client onboarded tomorrow is visible
-              to them immediately — which is the reason the role does not work by
-              granting each client one at a time.
-            </p>
-          </Card>
-        ) : (
-          <>
-            <Card
-              title="Client access"
-              description="Which clients this person can see, and whether they can move tasks"
-            >
-              {user.access.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">
-                  No clients granted yet, so this account signs in to an empty
-                  dashboard. Grant the first one below.
+            <div>
+              <h3 className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                Role
+              </h3>
+              {isSelf ? (
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  This is your own account. Its role cannot be changed here, so an
+                  administrator cannot lock themselves out of this screen.
                 </p>
               ) : (
-                <TableWrap>
-                  <Table>
-                    <THead>
-                      <Tr>
-                        <Th grow>Client</Th>
-                        <Th>Level</Th>
-                        <Th>Granted</Th>
-                        <Th>By</Th>
-                        <Th />
-                        <Th />
-                      </Tr>
-                    </THead>
-                    <TBody>
-                      {user.access.map((grant) => (
-                        <Tr key={grant.id}>
-                          <Td>
-                            <span className="font-medium text-heading">
-                              {grant.client.name}
-                            </span>
-                            {!grant.client.isActive && (
-                              <>
-                                <br />
-                                <span className="text-xs text-muted-foreground">
-                                  client suspended — this grant is dormant
-                                </span>
-                              </>
-                            )}
-                          </Td>
-                          <Td>
-                            <Badge tone={grant.level === "EDIT" ? "good" : "neutral"}>
-                              {accessLevelLabel(grant.level)}
-                            </Badge>
-                          </Td>
-                          <Td className="whitespace-nowrap text-muted-foreground">
-                            {formatDateTime(grant.createdAt)}
-                          </Td>
-                          <Td className="text-muted-foreground">
-                            {grant.grantedBy?.name ?? "—"}
-                          </Td>
-                          <Td>
-                            <ChangeLevelForm
-                              userId={user.id}
-                              clientId={grant.clientId}
-                              level={grant.level}
-                            />
-                          </Td>
-                          <Td>
-                            <RevokeAccessForm
-                              userId={user.id}
-                              clientId={grant.clientId}
-                            />
-                          </Td>
-                        </Tr>
-                      ))}
-                    </TBody>
-                  </Table>
-                </TableWrap>
+                <RoleForm userId={user.id} role={user.role} />
               )}
-            </Card>
+            </div>
+          </div>
+        </Card>
 
-            <Card title="Grant a client">
-              <GrantAccessForm userId={user.id} clients={availableClients} />
-            </Card>
-
-            <Card
-              title="Everything at once"
-              description="For someone who covers the whole book, or who should no longer be here"
-            >
-              <BulkAccessForms userId={user.id} />
-            </Card>
-          </>
-        )}
-
-        {/* ── Sessions ────────────────────────────────────────────────────── */}
+        {/* ── Where they are signed in ────────────────────────────────────── */}
         <Card
           title="Active sessions"
-          description="Where this account is currently signed in"
+          description={
+            user.sessions.length === 0
+              ? "Not signed in anywhere"
+              : `Signed in on ${user.sessions.length} device${user.sessions.length === 1 ? "" : "s"}`
+          }
           action={
             user.sessions.length > 0 ? <SessionForms userId={user.id} /> : undefined
           }
+          flush={user.sessions.length > 0}
         >
           {user.sessions.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              Not signed in anywhere.
+            <p className="py-2 text-sm text-muted-foreground">
+              This account has no live sessions.
             </p>
           ) : (
             <TableWrap>
@@ -289,7 +259,7 @@ export default async function UserAccessPage({
                       <Td muted className="max-w-[22rem] truncate">
                         {session.userAgent ?? "—"}
                       </Td>
-                      <Td>
+                      <Td align="right">
                         <SessionForms userId={user.id} sessionId={session.id} />
                       </Td>
                     </Tr>
@@ -300,33 +270,14 @@ export default async function UserAccessPage({
           )}
         </Card>
 
-        {/* ── The account itself ──────────────────────────────────────────── */}
-        <Card title="Password and account">
-          <AccountForms
-            userId={user.id}
-            isActive={user.isActive}
-            isSelf={isSelf}
-          />
-        </Card>
-
-        <Card title="Role">
-          {isSelf ? (
-            <p className="text-sm text-muted-foreground">
-              This is your own account. Its role cannot be changed here, so an
-              administrator cannot lock themselves out of this screen.
-            </p>
-          ) : (
-            <RoleForm userId={user.id} role={user.role} />
-          )}
-        </Card>
-
         {/* ── What they have done ─────────────────────────────────────────── */}
         <Card
           title="Recent activity"
           description="This account's own entries from the audit log"
+          flush={activity.length > 0}
         >
           {activity.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
+            <p className="py-2 text-sm text-muted-foreground">
               Nothing recorded for this account yet.
             </p>
           ) : (

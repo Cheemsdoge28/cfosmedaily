@@ -90,23 +90,24 @@
   --tone-neutral-fg: #475569;
 
   /*
-   * Charts. Validated with the data-viz checker against the light card surface:
-   * the series pair clears adjacent CVD ΔE 24.7 and 3:1 contrast, and the
-   * ordinal ramp is single-hue, monotone and clears the light-end floor.
+   * Progress.
+   *
+   * The fill on a completion meter — the client bars, the register's sliders. It
+   * is the same blue the charts use for "In progress", and that is deliberate:
+   * a half-full progress bar and a task marked in progress are the same fact, so
+   * they should not be two different blues.
+   *
+   * Stepped to 3.7:1 on the white card rather than taken raw from the wordmark
+   * (#22a3dc, 2.9:1), because a meter fill is a non-text element that has to be
+   * distinguishable from its own track.
+   *
+   * The six-hue chart ramp and the five-step ordinal ramp that used to live here
+   * are gone: nothing drew them. See src/components/charts/chart-tokens.ts, which
+   * holds the two palettes the charts actually use.
    */
-  --chart-1: #2a78d6;
-  --chart-2: #eb6834;
-  --chart-3: #1baf7a;
-  --chart-4: #eda100;
-  --chart-5: #6845d8;
-  --chart-6: #e87ba4;
+  --progress: #1b8ec4;
   --chart-grid: #eef1f5;
   --chart-tick: #667085;
-  --chart-ordinal-1: #86b6ef;
-  --chart-ordinal-2: #5598e7;
-  --chart-ordinal-3: #2a78d6;
-  --chart-ordinal-4: #1c5cab;
-  --chart-ordinal-5: #104281;
 }
 
 /*
@@ -159,19 +160,9 @@
   --tone-neutral-bg: #1e2a3d;
   --tone-neutral-fg: #a3b2c7;
 
-  --chart-1: #3987e5;
-  --chart-2: #d95926;
-  --chart-3: #199e70;
-  --chart-4: #c98500;
-  --chart-5: #9085e9;
-  --chart-6: #d55181;
+  --progress: #2f9fd0;
   --chart-grid: #22304a;
   --chart-tick: #94a3b8;
-  --chart-ordinal-1: #184f95;
-  --chart-ordinal-2: #256abf;
-  --chart-ordinal-3: #3987e5;
-  --chart-ordinal-4: #6da7ec;
-  --chart-ordinal-5: #9ec5f4;
 }
 
 @theme inline {
@@ -206,11 +197,7 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
+  --color-progress: var(--progress);
 
   /* App aliases, so existing markup keeps reading naturally. */
   --color-canvas: var(--background);

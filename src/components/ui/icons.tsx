@@ -83,6 +83,11 @@ export const Icons = {
       <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />
     </Svg>
   ),
+  chevronRight: (p: IconProps) => (
+    <Svg {...p}>
+      <path d="m9.5 5.5 6.5 6.5-6.5 6.5" />
+    </Svg>
+  ),
   calendar: (p: IconProps) => (
     <Svg {...p}>
       <rect x="3.5" y="5.5" width="17" height="15" rx="1.5" />

@@ -21,7 +21,8 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 export const ADMIN_NAV: NavItem[] = [
-  { href: "/admin", label: "Clients & Logins", icon: "users" },
+  { href: "/admin", label: "Clients", icon: "grid" },
+  { href: "/admin/users", label: "Users", icon: "users" },
   { href: "/admin/import", label: "Workbook Import", icon: "upload" },
   { href: "/admin/audit", label: "Audit Log", icon: "shield" },
 ];

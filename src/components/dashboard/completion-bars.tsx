@@ -78,7 +78,7 @@ export function CompletionBars({
                     ? "bg-[var(--negative)]"
                     : row.completion >= 100
                       ? "bg-[var(--positive)]"
-                      : "bg-[var(--chart-1)]",
+                      : "bg-[var(--progress)]",
                 )}
                 style={{ width: `${Math.max(row.completion, 1)}%` }}
               />

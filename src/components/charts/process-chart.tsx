@@ -27,9 +27,12 @@ import type { GroupRollup } from "@/lib/tasks/types";
  * directly instead, which is what a reader would otherwise get by squinting at the
  * axis.
  *
- * One hue throughout. Process names are nominal — Accounting is not more or less
- * than Compliance — so painting each bar a different colour would imply a
- * categorical scheme that means nothing and would cost the six reserved hues.
+ * One hue throughout, and deliberately not a status hue. Process names are
+ * nominal — Accounting is not more or less than Compliance — so painting each bar
+ * a different colour would imply a categorical scheme that means nothing. And
+ * painting them all the blue that means "In progress" would imply these tasks
+ * were in progress, which is a different and worse kind of wrong: the bar counts
+ * tasks in every state.
  */
 export function ProcessChart({ data }: { data: GroupRollup[] }) {
   const palette = useChartPalette();
@@ -99,7 +102,7 @@ export function ProcessChart({ data }: { data: GroupRollup[] }) {
           />
           <Bar
             dataKey="total"
-            fill={palette.series[0]}
+            fill={palette.neutralBar}
             radius={[0, 4, 4, 0]}
             maxBarSize={22}
             animationDuration={520}

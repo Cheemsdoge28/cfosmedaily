@@ -309,7 +309,7 @@ function ProgressEditor({
           className="h-1.5 w-20 overflow-hidden rounded-full bg-muted"
         >
           <div
-            className="h-full rounded-full bg-[var(--chart-1)]"
+            className="h-full rounded-full bg-[var(--progress)]"
             style={{ width: `${value}%` }}
           />
         </div>
@@ -339,7 +339,7 @@ function ProgressEditor({
         onKeyUp={() => commit()}
         onTouchEnd={() => commit()}
         className={cn(
-          "h-1.5 w-20 cursor-pointer accent-[var(--chart-1)]",
+          "h-1.5 w-20 cursor-pointer accent-[var(--progress)]",
           "disabled:cursor-not-allowed disabled:opacity-60",
         )}
       />

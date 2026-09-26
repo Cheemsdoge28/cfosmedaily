@@ -175,7 +175,9 @@ function PortalSidebar({
               // invisible label holding the mark 5px off centre on the rail.
               "group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0",
             )}>
-            CFOS<span className="text-sidebar-primary">ME</span>
+            {/* CFO in white, SME in the brand green — the wordmark reads
+                "CFO SME", not "CFOS ME". */}
+            CFO<span className="text-sidebar-primary">SME</span>
           </span>
         </Link>
       </SidebarHeader>
