@@ -8,7 +8,7 @@ import { CompletionBars } from "@/components/dashboard/completion-bars";
 import { DueWatch } from "@/components/dashboard/due-watch";
 import { KpiRow } from "@/components/dashboard/kpi-card";
 import { ModuleFrame, NoTasksNotice } from "@/components/dashboard/module-frame";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { Card, Row } from "@/components/ui/primitives";
 import { Icons } from "@/components/ui/icons";
 import { formatPercent, pluralTasks } from "@/lib/tasks/format";
@@ -34,10 +34,14 @@ export default async function DashboardPage({
       totals={totals}
       scopeLabel={scope.isPractice ? "All clients" : (scope.user.clientName ?? "Your register")}
       action={
-        <Button variant="outline" size="lg" render={<Link href="/dashboard/register" />}>
+        <ButtonLink
+          variant="outline"
+          size="lg"
+          render={<Link href="/dashboard/register" />}
+        >
           <Icons.list className="size-4" />
           <span className="hidden sm:inline">Task register</span>
-        </Button>
+        </ButtonLink>
       }
     >
       <KpiRow

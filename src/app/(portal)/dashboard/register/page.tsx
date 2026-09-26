@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { RegisterTable } from "@/app/(portal)/dashboard/register/register-table";
 import { ModuleFrame, NoTasksNotice } from "@/components/dashboard/module-frame";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { Callout, Card } from "@/components/ui/primitives";
 import { Icons } from "@/components/ui/icons";
 import { pluralTasks } from "@/lib/tasks/format";
@@ -39,7 +39,7 @@ export default async function RegisterPage({
       totals={totals}
       scopeLabel={scope.isPractice ? "All clients" : (scope.user.clientName ?? "Your register")}
       action={
-        <Button
+        <ButtonLink
           variant="outline"
           size="lg"
           render={
@@ -53,7 +53,7 @@ export default async function RegisterPage({
         >
           <Icons.download className="size-4" />
           <span className="hidden sm:inline">Download workbook</span>
-        </Button>
+        </ButtonLink>
       }
     >
       {scope.isPractice && (

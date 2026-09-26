@@ -1,493 +1,311 @@
-# RISEBIT CFO — Client Dashboard Portal
+# CFOSME Pulse Pro — Task Register Portal
 
-## Standard Operating Procedure, version 2.0
+## Standard Operating Procedure, version 1.0
 
-Supersedes version 1.0 (Hostinger + PHP + HTML). This edition covers the
-Next.js portal backed by a PostgreSQL database and the Zoho Books API.
+**Who this is for:** the CFOSME team who maintain the task register, onboard
+clients and give their people access.
 
-**Who this is for:** the RISEBIT CFO team who onboard clients, publish
-dashboards and hold the credentials.
+**What this covers:** the monthly working rhythm, importing the workbook,
+onboarding a client, access management, and what to do when something looks
+wrong.
+
+You do not need to understand the code to follow this. Where a step needs a
+developer, it says so.
 
 ---
 
 ## 1. Purpose
 
-Defines how client CFO dashboards are created, secured, deployed, updated and
-maintained on the RISEBIT CFO portal, so that each client signs in and sees only
-the figures belonging to them.
+CFOSME runs a recurring calendar of accounting, compliance and reporting work
+across its clients. That calendar lives in **CFOSME_Task_Tracker.xlsx**, and it
+still does — this portal does not replace the workbook. It gives the register:
+
+- a **dashboard** that answers "where does the month stand" without anyone
+  building a pivot;
+- a **register** that several people can edit at once, where an edit survives a
+  refresh and is recorded against the person who made it;
+- **per-client access**, so a client can be shown their own tasks without being
+  shown anyone else's.
 
 ---
 
-## 2. What changed from version 1.0, and why
+## 2. What changed from the workbook dashboard
 
-| v1.0 | v2.0 | Reason |
+The previous dashboard was a single HTML file that read the workbook in the
+browser. It worked, and it had four limits worth naming, because they explain why
+some things now behave differently:
+
+1. **Edits were not saved.** Moving a task to Done changed a value in the page
+   and nothing else; closing the tab lost it. Edits now persist.
+2. **Everyone saw everything.** Whoever had the file had all eighteen clients.
+   Access is now per client.
+3. **Two-thirds of the due dates were ignored.** The Due Date column holds real
+   dates on 29 rows and text an operator typed — `20th Sept`, `3rd Sept` — on the
+   other 59. The old dashboard read only the first kind and listed the rest as
+   "no recognised due date", so its Overdue figure was counting a third of the
+   register. All 88 now resolve, which means **the Overdue number is higher than
+   you are used to seeing, and it is the correct one.**
+4. **A task could be Done at 60%.** One is in the workbook today (TS0011). Status
+   and progress are now kept consistent — see §6.
+
+---
+
+## 3. Roles
+
+| Role | Who | Can do |
 |---|---|---|
-| A dashboard was a hand-edited HTML file per client | One application; data separates clients | A fix or a design change had to be repeated in every client's file |
-| Credentials lived in `config.php` | Credentials live in the database | Editing a PHP file to add a login is slow and easy to break |
-| Adding a client meant uploading a file and editing config | Adding a client is a form | Fewer steps, no syntax errors, and it is audited |
-| Figures were typed into JavaScript objects | Figures are rows in a database | Re-keying is where numbers go wrong |
-| Updating meant exporting from Zoho and re-keying | Zoho Books is read through its API | Removes the manual step entirely |
-| Totals were stored alongside their components | Totals are calculated from components | Stored totals drift out of agreement |
-| No record of who did what | Full audit log | Needed for any client-facing financial system |
+| CFOSME staff | The practice | Every client. Import the workbook, manage clients and logins, read the audit log. |
+| Client administrator | A client's own finance lead | Their own register, including editing status and progress. |
+| Viewer | Anyone at a client who only needs to look | Their own register, read-only. |
 
-**The v1.0 flaw worth naming.** The old dashboard stored revenue, EBITDA and net
-profit as separate numbers, then scaled each by its own factor when a filter
-changed. The file said as much in a comment: *"Historical FY EBITDA factors
-intentionally differ from revenue factors."* The result was that the KPI cards,
-the P&L table and the profitability bridge could each show a different answer for
-the same period. In v2.0 only inputs are stored and every subtotal is derived, so
-they cannot disagree.
+A client login can never see another client's tasks. This is enforced when the
+data is fetched, not by hiding things on screen, so it cannot be worked around by
+editing the address bar.
 
 ---
 
-## 3. System architecture
+## 4. The monthly rhythm
 
-```
-Client browser
-      |
-      v
-  risebitcfo.com  (Next.js on Vercel)
-      |
-      +-- sign-in  -> server-side session, database-backed
-      +-- portal   -> seven CFO modules, tenant-scoped queries
-      +-- admin    -> clients, logins, Zoho connections, audit log
-      |
-      v
-  PostgreSQL (Neon)          Zoho Books API
-  credentials + figures  <--  nightly + on-demand sync
-```
+The register is worked month by month. A normal month looks like this:
 
-There is no per-client file and no per-client URL. The signed-in session decides
-which tenant's rows are readable.
+**At the start of the month**
 
----
+1. Update **CFOSME_Task_Tracker.xlsx** as usual — new tasks, changed owners,
+   changed due dates.
+2. Sign in to the portal and go to **Administration → Workbook import**.
+3. Choose the file, and set **Month this workbook covers** to the month the
+   register is for (see §5 — this matters).
+4. Import. Read the result line: created, updated, unchanged, skipped.
+5. If anything was skipped, fix those rows in the workbook and import again.
+   Importing twice is safe.
 
-## 4. Security principles
+**Through the month**
 
-1. Authentication is server-side. The browser never decides what it may see.
-2. Passwords are bcrypt hashes in the database. Plaintext is never stored, and
-   temporary passwords are displayed exactly once.
-3. The session cookie holds a random token; only its SHA-256 hash is stored.
-4. Sessions expire after 12 hours absolute and 2 hours idle, and are revoked on
-   logout, password change and deactivation.
-5. Five failed sign-ins lock an account for 15 minutes.
-6. Every query is scoped to the session's client. One tenant cannot read
-   another's rows.
-7. Zoho tokens are AES-256-GCM encrypted at rest and never reach the browser.
-8. Sign-ins, credential changes and syncs are written to the audit log.
+6. The team works in **Task Register**, setting status and dragging progress.
+   Nothing needs saving; each change is written as it is made.
+7. Use the **Executive Dashboard** for the standing questions — who is behind,
+   what is overdue, where the work is concentrated.
+
+**At the end of the month**
+
+8. Press **Download workbook** on the register. That writes the same fourteen
+   columns back out, including who last moved each task and when.
+9. Keep that file as the month's record, and start the next month from it.
 
 ---
 
-## 5. Roles
+## 5. Importing the workbook
 
-| Role | May do |
+### 5.1 What it matches on
+
+Tasks are matched on the workbook's own **Task ID** (`TS0001`). That has three
+consequences worth knowing:
+
+- Importing the same file twice **updates** rather than duplicating.
+- Correcting a task's **Client** cell **moves** the task to that client. It does
+  not create a copy.
+- **Changing a Task ID creates a new task** and leaves the old one behind. If you
+  need to renumber, tell a developer rather than doing it in the workbook.
+
+A client named in the sheet that the portal has not seen before is **created
+automatically**, so taking on a new client needs no separate step.
+
+### 5.2 Why it asks for the month
+
+Because `20th Sept` does not say which September. The month you choose is what
+resolves that. Dates already written in full are unaffected.
+
+Set it to the month the register is for — not today's month. Importing September's
+workbook in October with "October" selected would date every one of those tasks a
+month late.
+
+### 5.3 What the sheet must contain
+
+A sheet named **Tasks** (or the first sheet), with a header row containing
+**Task ID**. Column order does not matter; the names do.
+
+Required on every row: **Task ID**, **Client**, **Owner**, **Frequency**.
+Everything else may be blank.
+
+- **Frequency** must be one of: Daily, Weekly, Fortnightly, Monthly, Quarterly,
+  Half-yearly, Annual, Ad hoc.
+- **Status** may be Done, In progress, At risk, Blocked, Not started. A blank
+  Status is taken as Not started. A word that is *not* one of these is reported
+  rather than guessed at — that is deliberate, because guessing would hide a typo.
+- **Progress %** may be a number or blank. A percentage-formatted cell (0.6) is
+  read as 60%.
+
+### 5.4 When rows are skipped
+
+A row that cannot be read does not fail the import. The rest go in, and the
+skipped rows are listed by row number with the cell at fault — for example
+*"Row 43 (TS0042): 'Quartely' is not a frequency this register knows."*
+
+Fix them in the workbook and import again. The list also stays on the import page
+until the next import, so you can come back to it.
+
+### 5.5 What gets recorded
+
+Every import is kept with its counts and who ran it, on the same page. Every task
+the import actually moved also gets a history entry marked as coming from a
+workbook, so a figure that arrived by upload is distinguishable from one somebody
+set by hand.
+
+---
+
+## 6. Status and progress
+
+These two are kept consistent, and the rule is worth knowing because it will
+occasionally move a figure you did not touch:
+
+| You do this | This happens |
 |---|---|
-| `PLATFORM_ADMIN` | Everything: create clients and logins, reset passwords, connect Zoho, read the audit log |
-| `CLIENT_ADMIN` | Their own client's dashboard; manage their own password |
-| `VIEWER` | Their own client's dashboard, read-only |
+| Set status to **Done** | Progress goes to 100% |
+| Drag progress to **100%** | Status becomes **Done** |
+| Drag a **Done** task below 100% | Status drops to **In progress** (or Not started at 0%) |
+| Move a **Done** task to another status | Progress resets, because 100% would snap it straight back |
+| Drag a **Blocked** task to 40% | It stays **Blocked** — progress says nothing about why it is stuck |
 
-Platform admin accounts belong to RISEBIT staff and are not tied to a client.
+The same rule is applied to imports. A row that arrives as Done at 60% is stored
+as In progress at 60%: the progress figure is the one somebody typed a number
+into, so it is trusted and the status is corrected to match.
 
 ---
 
-## 6. Environment and secrets
+## 7. Onboarding a client
 
-Secrets live in the Vercel project, never in the repository.
+Most clients need no onboarding at all — the import creates them. You only need
+this when a client's own people are to be given access.
 
-| Variable | Notes |
+1. **Administration → Clients & logins**.
+2. If the client is not listed (no tasks imported yet), use **Add a client**.
+   The **Client name must match the workbook's Client column exactly**, because
+   that is what imports match on. A mismatch creates a second client.
+3. Use **Add a login**: the person's name, e-mail, and whether they may edit
+   (Client administrator) or only look (Viewer).
+4. A **temporary password is shown once**. Send it over a different channel from
+   the e-mail address — not in the same message. They must change it at first
+   sign-in.
+
+### Suspending a client
+
+**Suspend** on the client's row signs out everyone at that client and makes their
+register read-only. Their tasks and history are kept. **Reactivate** restores
+access.
+
+---
+
+## 8. Access management
+
+- Passwords must be at least 12 characters with an uppercase letter, a lowercase
+  letter, a digit and a symbol.
+- Five failed attempts locks the account for a period. It clears on a password
+  reset.
+- **Reset password** issues a new temporary password and signs that person out
+  everywhere.
+- **Deactivate** blocks a login and signs them out. Use it the day someone
+  leaves. You cannot deactivate your own account.
+- A session ends after **12 hours** regardless, or **2 hours** of inactivity.
+- Anyone can see their own active sessions under **Account settings**, and
+  changing a password signs out every other device.
+
+---
+
+## 9. Reading the dashboard
+
+| Figure | What it means |
 |---|---|
-| `DATABASE_URL` | Neon **pooled** connection (the `-pooler` host) |
-| `DIRECT_URL` | Neon **direct** connection — migrations only |
-| `APP_ENCRYPTION_KEY` | base64 32-byte key; `npm run keygen` |
-| `CRON_SECRET` | Bearer token for the nightly sync |
-| `APP_URL` | e.g. `https://risebitcfo.com` |
-| `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REGION` | From the Zoho API console |
+| **Completion** | Average progress of the tasks in view. Not "share done" — four tasks all at 90% is a client nearly finished, and 0% would not describe that. |
+| **Tasks in view** | How many the slicers leave. |
+| **Completed** | Status is Done. |
+| **Needs attention** | In progress, at risk or blocked. Deliberately *not* everything unfinished: on the 1st every monthly task is Not started and that needs no attention. |
+| **Overdue** | Open, and past a due date. A task finished late is not overdue; it is done. |
 
-**Rotating `APP_ENCRYPTION_KEY` makes stored Zoho tokens unreadable.** Every
-client must be reconnected afterwards. Plan it deliberately.
+**Completion by client** lists the weakest first, so whoever needs help is never
+below the fold. A client with overdue work shows a red bar whatever its
+percentage.
 
----
+**Due date watch** also reports *"No recognised due date"*. On a clean workbook
+this should be **zero**. Above zero means a Due Date cell nobody can read, and
+those tasks are excluded from Overdue — so treat it as a workbook to correct.
 
-## 7. Onboarding a new client
-
-The whole flow lives at **Clients** in the sidebar (platform administrators
-only). Each client then has its own setup page showing the four steps and which
-are done.
-
-### 7.1 Create the client
-
-**Clients** → *Add a client*.
-
-- **Name** — as it should appear in the dashboard header.
-- **Slug** — lowercase, used internally; do not change it casually.
-- **Currency** — three-letter code. INR is presented in lakhs and crores.
-- **FY starts in** — April for Indian entities.
-- **Business units** — comma separated, e.g. `Manufacturing, Trading`. Leave
-  blank for a single consolidated unit. These become the *Business Unit* filter;
-  "All Units" is their sum, not a unit of its own.
-- **Fiscal years to create** — two by default, so the dashboard has a prior year
-  to compare against. Fewer and every year-on-year column reads "no comparative
-  period".
-- **First login** *(optional)* — creates a client administrator in the same
-  step. Leave blank to add logins later.
-
-Creating the client also creates its fiscal years. This matters: the dashboard
-resolves its filters against them, and a Zoho sync refuses any month that no
-fiscal year covers rather than guessing.
-
-You are then taken to the client's setup page.
-
-### 7.2 Give each person a login
-
-On the client's page, **2 · Logins** → *Add a login*.
-
-**One account per person. Never a shared login** — the audit log is only useful
-if it says who actually signed in.
-
-- **Viewer** — read-only access to that client's dashboard.
-- **Client administrator** — the same dashboard; the role records who is
-  accountable for the account.
-
-Each login gets a temporary password that is **shown once**. Copy it
-immediately and send it over a secure channel, separately from the e-mail
-address. Never e-mail the two together and never put either on the public
-website. The user is forced to change it at first sign-in.
-
-Existing accounts can be changed from the same table: switch a role and *Save*,
-*Reset password* (which also signs that person out everywhere), or *Deactivate*.
-
-### 7.3 Load the figures
-
-Either connect Zoho Books (section 8) or enter figures directly (section 9).
-
-### 7.4 Test before delivery
-
-Run the checklist in section 12.
+Every slicer shows a count beside each option: how many tasks that choice would
+leave *given what is already selected*. An option showing 0 is a dead end.
 
 ---
 
-## 8. Connecting Zoho Books
+## 10. Before showing it to a client
 
-### 8.1 One-time platform setup
-
-1. At <https://api-console.zoho.com>, create a **Server-based Application**.
-2. Authorized redirect URI: `{APP_URL}/api/zoho/callback` — exactly, including
-   scheme and any trailing path.
-3. Put the client ID and secret in the Vercel environment.
-4. Set `ZOHO_REGION` to the client's data centre (`in` for Zoho India).
-
-### 8.2 Per client
-
-On the client's setup page, **3 · Zoho Books** → *Connect Zoho Books* → approve
-on Zoho's consent screen. You are returned with the organization linked and the
-status showing **Connected**.
-
-If the Zoho login can see more than one organization, a picker appears —
-choose the one whose books belong to this client. With a single organization it
-is bound automatically.
-
-**Zoho Integration** in the sidebar shows the same status across every client at
-once, which is the quicker way to spot a connection that has gone stale.
-
-### 8.3 Importing figures
-
-**4 · Import figures** on the client's page takes a month range. It defaults to
-every fiscal year the client has, which is what a first import wants: two full
-years so the dashboard has a prior year to compare against. Later imports can be
-narrowed to the months that changed.
-
-Each month pulls the Profit & Loss, Balance Sheet, Cash Flow and both ageing
-summaries. A month that no fiscal year covers is reported rather than guessed
-at, so add the fiscal year first and re-run.
-
-### 8.4 Validate the first sync
-
-**This step is not optional.** Zoho's report labels differ between charts of
-accounts, so the first sync for a new client must be checked:
-
-1. Run *Sync now* and note the months processed and records written.
-2. Open the Zoho Books P&L for the latest synced month.
-3. Compare revenue, COGS, operating expenses and net profit against the
-   dashboard.
-4. Compare the Balance Sheet cash, receivables, payables and inventory.
-5. If a line reads zero that should not, the account name did not match a
-   pattern. Extend `src/lib/zoho/mappers.ts` and re-sync.
-
-Record the comparison. This is the v2.0 equivalent of "review figures before
-publishing".
-
-### 8.5 What the mapping relies on
-
-Zoho's report endpoints are not publicly documented. The following was
-established against a live organization and is what `src/lib/zoho/mappers.ts`
-depends on — worth knowing before changing it.
-
-- **Rows hang off a report-named key**: `profit_and_loss`, `balance_sheet`,
-  `cash_flow`. The parser follows any array rather than a fixed list of keys.
-- **The caption that identifies a subtotal is `total_label`**
-  ("Total Operating Income"), not `name` ("Operating Income"). Both are indexed.
-- **Cash is two sibling sections**, "Cash" and "Bank"; the closing position is
-  their sum.
-- **The balance sheet is the as-at source.** The cash flow report returns the
-  same beginning and ending balance whatever period is requested, so it is used
-  only for investing and financing flows.
-- **Ageing takes `to_date`, never `filter_by`** — passing `filter_by` is
-  rejected. The payload is `invoice` / `bills` as an object, with `intervals`
-  for the bands and a nested, recursive `group_list` for counterparties. Only
-  the leaves of that tree are real counterparties; the parent nodes are
-  subtotals and counting them would double the balances.
-- **Ageing bands are an organization setting.** One org reports
-  1-15 / 16-30 / 31-45 / above-45; another may use 30-day bands. They are stored
-  exactly as reported rather than remapped, so the dashboard shows the same
-  bands as the client's own Zoho report.
-
-Every sync checks its own arithmetic: the net profit derived from the mapped
-figures is compared against the "Net Profit/Loss" Zoho itself reports, and a
-mismatch is recorded on the sync run. That check is what catches an account
-which matched no pattern and came through as zero.
-
-### 8.6 Ongoing
-
-The nightly job at 01:30 UTC re-syncs every client with auto-sync enabled.
-Sync history, including failures, is shown per client on the integrations page.
+1. Sign in as that client's own login, not yours, and confirm you see **only**
+   their tasks.
+2. Check the client slicer is fixed to them.
+3. Check the Overdue figure against the workbook, and that "No recognised due
+   date" is zero.
+4. If they are a Viewer, confirm the status and progress controls are not
+   editable.
+5. Use **Print / PDF** if they want a copy — the chrome drops away and the
+   figures fill the page.
 
 ---
 
-## 9. Entering figures without Zoho
+## 11. Troubleshooting
 
-Use Prisma Studio. One `MonthlySnapshot` row per business unit per month.
-
-Enter **only** these, in base currency units — rupees, not lakhs:
-
-| Field | Meaning |
+| Symptom | Likely cause |
 |---|---|
-| `revenue` | Operating income |
-| `cogs` | Cost of goods sold |
-| `opex` | Operating expenses, excluding depreciation, finance cost and tax |
-| `depreciation` | Depreciation and amortisation |
-| `financeCost` | Interest and bank charges |
-| `taxExpense` | Income tax |
-| `otherIncome` | Non-operating income |
-| `cashAndBank` | Closing cash |
-| `receivables`, `payables`, `inventory` | Closing balances |
-| `capex` | Capital expenditure in the period (positive) |
-| `financingNet` | Net financing: negative for repayments |
-
-**Do not look for gross profit, EBITDA or net profit fields.** They do not
-exist, by design. They are calculated.
-
-Leave `source` as `MANUAL` so manually entered figures stay distinguishable from
-Zoho-sourced ones.
+| "The table `public.User` does not exist" | The database has not been migrated. A developer runs `npm run db:deploy`. |
+| Import says "Could not find the header row" | Wrong file, or the Tasks sheet has no **Task ID** header. |
+| Import says a column is missing | Check the four required column names are spelled as in §5.3. |
+| A task appears twice | Its Task ID changed between imports. The old one is still there; tell a developer. |
+| A client appears twice | Two spellings of the name. Check the workbook's Client column against the Clients list. |
+| Overdue looks too high | Expected — see §2, item 3. Verify a few against the workbook. |
+| Due dates are all one day out | Tell a developer, and say which timezone the machine is in. |
+| Someone cannot sign in | Check the login is Active and not Locked under Clients & logins. Reset the password if needed. |
+| A figure on the dashboard disagrees with the register | It cannot — every figure is computed from the register on each load. Reload; if it persists, tell a developer. |
 
 ---
 
-## 10. Dashboard content standard
-
-The seven modules, unchanged in purpose from v1.0:
-
-1. Executive Dashboard — profitability, liquidity, working capital, attention list
-2. Profit & Loss — monthly columns or YTD against the prior year
-3. Cash Flow — indirect method, reconciled to the balance movement
-4. Receivables — ageing and the largest customer balances
-5. Payables — ageing and the largest supplier balances
-6. Bank & Liquidity — balances, reconciliation, liquidity cover
-7. MIS Reports — KPIs against target, and period-on-period movement
-
-A dashboard should answer, quickly: what is revenue; what is profitability; where
-is cash; what is owed to us; what we owe; where expenses are rising; what needs
-management attention.
-
-Management targets drive the MIS variance columns. Add them as `KpiTarget` rows
-per fiscal year; a metric with no target shows "No target" rather than an
-invented one.
-
----
-
-## 11. Design standard
-
-Carried forward from v1.0 and now enforced by the shared components:
-
-- RISEBIT CFO branding, client name, and the reporting period visible.
-- The active filters are echoed under every module heading.
-- Headline KPIs at the top of each module.
-- Readable on a phone: tables scroll rather than clip, the sidebar becomes a
-  drawer, KPI cards go two across.
-- The Logout button is always visible in the top bar.
-- Print/PDF drops the chrome and prints the figures.
-- No client's data is ever reachable from another client's session.
-
-Chart rules are not stylistic preferences — they are in place because the
-alternatives mislead. No dual axes. Colour follows the entity, so filtering never
-repaints a series. Ordered bands get an ordinal ramp; unordered categories get a
-single hue. Palettes were validated for colour-vision deficiency and contrast.
-
----
-
-## 12. Testing before client delivery
-
-Run every one of these. Record the date and who ran them.
-
-**Authentication**
-
-- [ ] Correct credentials open the correct client's dashboard.
-- [ ] Wrong password is rejected with a generic message.
-- [ ] Five wrong passwords lock the account; the message says so.
-- [ ] Logout returns to the sign-in page.
-- [ ] After logout, opening `/dashboard` directly redirects to sign-in.
-- [ ] A private browsing window cannot reach a dashboard without signing in.
-- [ ] A newly created login is forced to change its password before entry.
-
-**Isolation**
-
-- [ ] Client A's credentials show only client A's figures.
-- [ ] Client B's credentials show only client B's figures.
-- [ ] Two accounts on the same client both see that client, and only it.
-- [ ] A `VIEWER` cannot open `/admin`, and sees no admin links in the sidebar.
-
-**Figures**
-
-- [ ] Executive, P&L and MIS agree on revenue, EBITDA and net profit for the
-      same period.
-- [ ] Switching Monthly/YTD changes the figures coherently.
-- [ ] "All Units" equals the sum of the individual business units.
-- [ ] Cash flow reconciles: opening + OCF − capex + financing = closing.
-- [ ] Against Zoho Books, or the client's own statements, for one month.
-
-**Presentation**
-
-- [ ] Readable on a phone; no horizontal page scroll.
-- [ ] Logout visible on mobile.
-- [ ] Print/PDF produces a usable document.
-
----
-
-## 13. Update cycle
-
-```
-New period closed in Zoho Books
-        |
-        v
-Sync (nightly, or "Sync now")
-        |
-        v
-Review the figures against the source reports
-        |
-        v
-Note anything that needs a mapping change
-        |
-        v
-Confirm to the client that the period is published
-```
-
-There is no file to back up and no file to replace. The database is the record,
-and Vercel keeps every previous deployment of the application.
-
----
-
-## 14. Password and access management
-
-**Resetting a password.** **Clients** → the user's row → *Reset password*. A new
-temporary password is shown once, all their sessions are signed out, and they
-must change it at next sign-in.
-
-**Changing a role.** Pick the new role in the user's row and *Save*. Both roles
-see the same dashboard; the role records who is accountable for the account.
-
-**Removing access.** *Deactivate*. The account is refused immediately and all its
-sessions are revoked. Deactivate rather than delete — deleting removes the audit
-trail attached to the account.
-
-**Adding a colleague.** A client can have as many accounts as it needs. Add one
-per person from the client's setup page; never issue a shared login.
-
-**Leavers.** Deactivate the same day. Confirm in the audit log that no sign-in
-follows.
-
-**A user changing their own password** signs out every other device
-automatically.
-
----
-
-## 15. Backups and recovery
-
-Neon provides point-in-time restore; confirm the retention window on the plan in
-use and check it covers at least the last two reporting cycles.
-
-Before a schema migration on production data:
-
-1. Take a Neon branch or snapshot.
-2. Apply the migration to a branch first and confirm the dashboard still reads
-   correctly.
-3. Apply to production.
-4. Verify one client's figures immediately afterwards.
-
-Application code is in Git. Rolling back a bad deployment is a Vercel rollback,
-not a file restore.
-
----
-
-## 16. Change management
-
-For any material change, record: date, client, what changed, source reports used,
-who did it, and what was tested. The audit log covers access and sync events
-automatically; this record covers everything else.
-
----
-
-## 17. Troubleshooting
-
-| Symptom | Where to look |
-|---|---|
-| Sign-in rejected | Is the account active and unlocked? Check the audit log for `auth.login.*` |
-| "Temporarily locked" | Five failed attempts. Wait 15 minutes, or reset the password to clear it |
-| Dashboard shows "No financial data" | The client has no fiscal year, or no snapshots in it |
-| A figure is zero after a sync | The Zoho account name did not match a pattern in `src/lib/zoho/mappers.ts` |
-| Sync fails with an authorisation error | The refresh token was revoked in Zoho. Reconnect |
-| Sync fails on every month | Check `ZOHO_REGION` matches the client's data centre |
-| "All Units" does not equal the sum of units | A business unit is missing a snapshot for that month |
-| Cash flow looks wrong | Check the previous month exists — opening cash comes from it |
-| Everything 500s after a deploy | `DATABASE_URL` missing, or migrations not applied |
-
----
-
-## 18. Do and don't
+## 12. Do and don't
 
 **Do**
 
-- Keep secrets in the Vercel environment.
-- Validate the first sync of every new client against the source reports.
-- Deactivate leavers the same day.
-- Test isolation with two clients before delivery.
-- Take a database snapshot before a schema migration.
+- Keep updating the workbook. It is still the source of truth.
+- Import whenever it changes. There is no cost to importing often.
+- Set the import month to the month the register covers.
+- Read the skipped-row list rather than ignoring it.
+- Download the workbook at month end and keep it.
 
 **Don't**
 
-- Put credentials, client figures or dashboard links on the public website.
-- E-mail a username and its password together.
-- Reuse a temporary password, or send one that was already shown.
-- Enter a calculated total into the database — it will be ignored or will
-  conflict with the derived one.
-- Rotate `APP_ENCRYPTION_KEY` without planning to reconnect every client.
-- Point `DATABASE_URL` at the unpooled Neon host in production.
+- Don't renumber Task IDs in the workbook.
+- Don't add a client whose name differs from the workbook's spelling.
+- Don't send a temporary password in the same message as the e-mail address.
+- Don't share one login between people — the history is only useful if it names
+  the person who made the change.
+- Don't assume an unfinished task is overdue. Check its due date.
 
 ---
 
-## 19. Public website
+## 13. For developers
 
-The marketing site must not display client financial information, usernames,
-passwords or dashboard links. A **Client Login** button pointing at the portal
-sign-in page is the only connection between them.
+Setup, architecture and the reasoning behind the data model are in
+[`../README.md`](../README.md). Two commands are worth knowing:
+
+```bash
+npm run check                    # the register's rules, no database needed
+npm run check:workbook -- <file> # parse a workbook and prove the round trip
+```
+
+`npm run check:workbook` reports what parsed, what resolved and what could not be
+read, then writes the register back out, re-reads it, and requires every field of
+every row to come back identical. Run it against a real workbook before trusting
+a change to the importer or the export.
 
 ---
 
-## 20. Planned work
+## 14. Change management
 
-Not yet built, in the order it is most useful:
-
-1. A figures editor, so section 9 stops needing Prisma Studio.
-2. CSV import as a fallback for clients not on Zoho Books.
-3. Scheduled PDF delivery to a client's finance team.
-4. Mapping Zoho branches onto business units, so segment detail syncs
-   automatically rather than landing on the default unit.
-5. Letting client administrators add their own colleagues, so RISEBIT is not in
-   the loop for every new viewer.
+Anything that changes what a client sees — a schema change, a change to how a
+figure is derived, a change to the importer — goes through a developer, is tested
+against a real workbook with `npm run check:workbook`, and is checked on the
+dashboard against the previous month's figures before anyone tells a client the
+numbers have moved.

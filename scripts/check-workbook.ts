@@ -17,13 +17,14 @@ import { buildWorkbook, parseWorkbook } from "../src/lib/tasks/workbook";
 import { frequencyLabel, statusLabel } from "../src/lib/tasks/format";
 import { daysUntil } from "../src/lib/tasks/due-date";
 
-const FILE = process.argv[2];
+const FILE: string | undefined = process.argv[2];
 if (!FILE) {
   console.error(
     "usage: npm run check:workbook -- <path to CFOSME_Task_Tracker.xlsx> [YYYY-MM]",
   );
   process.exit(2);
 }
+const file: string = FILE;
 
 // The month a bare "20th" belongs to, as the import screen asks for.
 const period = process.argv[3] ?? "2026-09";
@@ -31,7 +32,7 @@ const [py, pm] = period.split("-").map(Number);
 const PERIOD = { year: py!, month: pm! };
 
 async function main() {
-  const buf = readFileSync(FILE);
+  const buf = readFileSync(file);
   const parsed = await parseWorkbook(buf, PERIOD);
 
   console.log("=== PARSE ===");

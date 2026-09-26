@@ -195,51 +195,78 @@ async function main() {
   );
 
   // ── Accounts ──────────────────────────────────────────────────────────────
+  //
+  // A password is only ever set when the account is created. Re-running the seed
+  // deliberately leaves an existing account alone — it may well have had its
+  // password changed since — so it must not print one it did not apply. An
+  // earlier version of this used `upsert` with an empty `update` and printed a
+  // fresh password on every run, which meant the credentials it offered on the
+  // second run simply did not work.
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@cfosme.test";
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD || strongPassword();
-  const clientPassword = process.env.SEED_CLIENT_PASSWORD || strongPassword();
+  const clientEmail = "finance@benchmark.test";
+  const demoClient = clientNames[0]!;
 
-  await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: {},
-    create: {
-      email: adminEmail,
-      name: "CFOSME Administrator",
-      role: "PLATFORM_ADMIN",
-      passwordHash: await bcrypt.hash(adminPassword, 12),
-      mustChangePassword: !process.env.SEED_ADMIN_PASSWORD,
-    },
+  async function ensureUser(input: {
+    email: string;
+    name: string;
+    role: "PLATFORM_ADMIN" | "CLIENT_ADMIN";
+    clientId?: string;
+    password: string;
+    passwordWasGiven: boolean;
+  }): Promise<string> {
+    const existing = await prisma.user.findUnique({
+      where: { email: input.email },
+      select: { id: true },
+    });
+
+    if (existing) return "already exists — password left unchanged";
+
+    await prisma.user.create({
+      data: {
+        email: input.email,
+        name: input.name,
+        role: input.role,
+        clientId: input.clientId,
+        passwordHash: await bcrypt.hash(input.password, 12),
+        mustChangePassword: !input.passwordWasGiven,
+      },
+    });
+
+    return input.passwordWasGiven
+      ? "created, with the password from the environment"
+      : `created — password: ${input.password}`;
+  }
+
+  const adminResult = await ensureUser({
+    email: adminEmail,
+    name: "CFOSME Administrator",
+    role: "PLATFORM_ADMIN",
+    password: process.env.SEED_ADMIN_PASSWORD || strongPassword(),
+    passwordWasGiven: Boolean(process.env.SEED_ADMIN_PASSWORD),
   });
 
   // One client login too, so the narrowed view a client sees can be checked
   // without creating an account by hand.
-  const demoClient = clientNames[0]!;
-  await prisma.user.upsert({
-    where: { email: "finance@benchmark.test" },
-    update: {},
-    create: {
-      email: "finance@benchmark.test",
-      name: `${demoClient} Finance`,
-      role: "CLIENT_ADMIN",
-      clientId: clientIds.get(demoClient)!,
-      passwordHash: await bcrypt.hash(clientPassword, 12),
-      mustChangePassword: !process.env.SEED_CLIENT_PASSWORD,
-    },
+  const clientResult = await ensureUser({
+    email: clientEmail,
+    name: `${demoClient} Finance`,
+    role: "CLIENT_ADMIN",
+    clientId: clientIds.get(demoClient)!,
+    password: process.env.SEED_CLIENT_PASSWORD || strongPassword(),
+    passwordWasGiven: Boolean(process.env.SEED_CLIENT_PASSWORD),
   });
 
   console.log("\n  Accounts");
   console.log(`    CFOSME staff  : ${adminEmail}`);
-  if (!process.env.SEED_ADMIN_PASSWORD) {
-    console.log(
-      `    password      : ${adminPassword}   (shown once — must be changed at first sign-in)`,
-    );
-  }
-  console.log(`    client login  : finance@benchmark.test  (${demoClient})`);
-  if (!process.env.SEED_CLIENT_PASSWORD) {
-    console.log(
-      `    password      : ${clientPassword}   (shown once — must be changed at first sign-in)`,
-    );
-  }
+  console.log(`                    ${adminResult}`);
+  console.log(`    client login  : ${clientEmail}  (${demoClient})`);
+  console.log(`                    ${clientResult}`);
+  console.log(
+    "\n    A newly created password is shown once and must be changed at first",
+  );
+  console.log(
+    "    sign-in. To reset one later, use Administration -> Clients & logins.",
+  );
 
   console.log("\nDone.\n");
 }
