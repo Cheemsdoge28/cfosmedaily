@@ -1,38 +1,52 @@
 import { FilterBar } from "@/components/dashboard/filter-bar";
 import { EmptyState, PageHeading, Stack } from "@/components/ui/primitives";
-import type { ResolvedFilters } from "@/lib/finance/types";
+import { pluralTasks } from "@/lib/tasks/format";
+import type { ResolvedFilters, TaskTotals } from "@/lib/tasks/types";
 
 /**
- * Shared frame for every module: the page heading, the filters, and the
- * vertical rhythm the content sits in. Because each module renders through
- * this, no page can invent its own spacing.
+ * Shared frame for both views: the page heading, the slicers, and the vertical
+ * rhythm the content sits in. Because each page renders through this, neither can
+ * invent its own spacing or describe the filters differently.
  */
 export function ModuleFrame({
   title,
   description,
   filters,
+  totals,
+  scopeLabel,
+  action,
   children,
 }: {
   title: string;
   description: string;
   filters: ResolvedFilters;
+  totals: TaskTotals;
+  /** Whose register this is — the client's name, or the whole practice. */
+  scopeLabel: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const unitName =
-    filters.businessUnits.find((u) => u.id === filters.businessUnitId)?.name ??
-    "All Units";
+  const client = filters.clientId
+    ? filters.clients.find((option) => option.value === filters.clientId)?.label
+    : null;
 
-  const periodLabel =
-    filters.viewMode === "ytd"
-      ? `YTD through ${filters.month.label}`
-      : filters.month.label;
+  // The meta line answers "what am I looking at" without the reader having to
+  // read five dropdowns back to themselves.
+  const meta = [
+    client ?? scopeLabel,
+    pluralTasks(totals.total),
+    filters.activeCount > 0
+      ? `${filters.activeCount} filter${filters.activeCount === 1 ? "" : "s"} applied`
+      : "unfiltered",
+  ].join(" · ");
 
   return (
     <div className="mx-auto w-full max-w-[96rem]">
       <PageHeading
         title={title}
         description={description}
-        meta={`${periodLabel} · ${unitName} · ${filters.fiscalYear.label}`}
+        meta={meta}
+        action={action}
       />
 
       <FilterBar filters={filters} />
@@ -42,8 +56,21 @@ export function ModuleFrame({
   );
 }
 
-export function NoDataNotice() {
+/**
+ * Shown when the register is empty rather than merely filtered to nothing.
+ *
+ * The distinction matters: a reader who has filtered their way to an empty table
+ * needs to know to widen it, whereas a fresh install needs to be told where tasks
+ * come from at all.
+ */
+export function NoTasksNotice({ canImport }: { canImport: boolean }) {
   return (
-    <EmptyState message="No figures have been loaded yet. This dashboard fills in as soon as the first month is imported from the accounting system." />
+    <EmptyState
+      message={
+        canImport
+          ? "The register is empty. Import CFOSME_Task_Tracker.xlsx from Administration → Workbook import, and the dashboard fills in from it."
+          : "No tasks have been loaded for your account yet. CFOSME imports the task register from its workbook; this dashboard fills in as soon as they do."
+      }
+    />
   );
 }

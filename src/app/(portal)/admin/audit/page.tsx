@@ -16,7 +16,7 @@ import {
 import { auditActionLabel } from "@/lib/admin/labels";
 import { requirePlatformAdmin } from "@/lib/auth/guard";
 import { prisma } from "@/lib/db";
-import { formatDateTime } from "@/lib/finance/format";
+import { formatDateTime } from "@/lib/tasks/format";
 
 export const metadata: Metadata = { title: "Audit log" };
 
@@ -26,7 +26,7 @@ const SECURITY_EVENTS = new Set([
   "auth.login.locked",
   "user.password.reset",
   "user.deactivate",
-  "zoho.sync.failure",
+  "import.failure",
 ]);
 
 export default async function AuditPage({
@@ -59,7 +59,7 @@ export default async function AuditPage({
     <div className="mx-auto w-full max-w-[96rem]">
       <PageHeading
         title="Audit log"
-        description="Every sign-in, password change and figure import, newest first."
+        description="Every sign-in, password change, workbook import and task move, newest first."
         meta={`${total.toLocaleString()} entries recorded`}
       />
       <Stack>

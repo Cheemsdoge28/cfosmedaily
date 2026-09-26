@@ -1,74 +1,27 @@
 import Image from "next/image";
 
-import cfoWordmark from "../../../public/risebit-cfo-logo.png";
-import growthMark from "../../../public/risebit_logo.svg";
+import cfosmeLogo from "../../../public/cfosme-logo.png";
 
 /**
  * Brand assets.
  *
  * Imported rather than referenced by path, and that is the whole point.
  *
- * A string `src="/risebit-cfo-logo.png"` is a stable URL: replace the file
- * with new artwork under the same name and browsers, the Next image optimizer
- * and any CDN in front of them all keep serving what they already have — the
- * login page went on showing the previous wordmark long after the file had
- * changed. Importing the file makes the bundler emit it at a content-hashed
- * path (`/_next/static/media/risebit-cfo-logo.<hash>.png`), so the URL changes
- * the moment the bytes do and nothing can serve a stale copy. It also carries
- * the real dimensions, so no call site has to restate them and be wrong later.
+ * A string `src="/cfosme-logo.png"` is a stable URL: replace the file with new
+ * artwork under the same name and browsers, the Next image optimizer and any CDN
+ * in front of them all keep serving what they already have. Importing the file
+ * makes the bundler emit it at a content-hashed path
+ * (`/_next/static/media/cfosme-logo.<hash>.png`), so the URL changes the moment
+ * the bytes do and nothing can serve a stale copy. It also carries the real
+ * dimensions, so no call site has to restate them and be wrong later.
  *
- * Two files, each with a surface it belongs on:
- *
- *   risebit_logo.svg      the gold growth mark on a transparent ground — the
- *                         only one that can sit on the navy chrome.
- *   risebit-cfo-logo.png  the full "RISEBIT · CFO Dashboard" wordmark, ground
- *                         removed. The supplied `.webp` had no alpha channel
- *                         and carried a faint near-white gradient (#fafafa at
- *                         the top edge, #fefefe elsewhere) that showed as a
- *                         grey rectangle on a white card; the PNG has no
- *                         opaque near-white pixels left, so it sits cleanly on
- *                         any surface in either theme. The `.webp` is kept
- *                         alongside it as the original.
+ * The logo is the wordmark lifted from the workbook dashboard this replaces,
+ * where it was a base64 blob inline in the HTML — 175x60 with a transparent
+ * ground, so it sits cleanly on both the light card and the deep sidebar.
  */
 
-/** Gold mark alone — for dark backgrounds. */
-export function RisebitMark({
-  size = 34,
-  className,
-}: {
-  size?: number;
-  className?: string;
-}) {
-  return (
-    <Image
-      src={growthMark}
-      alt=""
-      width={size}
-      height={size}
-      // `h-auto` because the reset's `img { max-width: 100% }` can narrow the
-      // image inside a tight column while the height attribute holds: one
-      // dimension moves, the other does not, and the mark is squashed. Letting
-      // height follow width keeps it square whatever the column does.
-      className={`h-auto ${className ?? ""}`}
-      priority
-    />
-  );
-}
-
-/** Mark plus wordmark, laid out for the navy sidebar. */
-export function RisebitLockup() {
-  return (
-    <div className="flex items-center gap-2.5">
-      <RisebitMark size={32} className="w-8 shrink-0" />
-      <span className="text-xl leading-none font-extrabold tracking-wide text-white">
-        RISE<span className="text-gold">BIT</span>
-      </span>
-    </div>
-  );
-}
-
-/** The full CFO Dashboard wordmark, at whatever width its container gives it. */
-export function RisebitCfoWordmark({
+/** The wordmark, at whatever width its container gives it. */
+export function CfosmeWordmark({
   className,
   priority = false,
 }: {
@@ -77,11 +30,51 @@ export function RisebitCfoWordmark({
 }) {
   return (
     <Image
-      src={cfoWordmark}
-      alt="RISEBIT CFO Dashboard"
-      sizes="(max-width: 480px) 90vw, 320px"
+      src={cfosmeLogo}
+      alt="CFOSME"
+      sizes="(max-width: 480px) 60vw, 220px"
       className={className}
       priority={priority}
     />
+  );
+}
+
+/**
+ * The sidebar mark.
+ *
+ * On the collapsed icon rail there is a 32px square and no room for a 175px
+ * wordmark, so the rail gets the monogram instead of a logo squeezed to
+ * illegibility. Drawn rather than cropped from the PNG, so it stays sharp at any
+ * size and takes the sidebar's own colours.
+ */
+export function CfosmeMark({
+  size = 32,
+  className,
+}: {
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+    >
+      <rect width="32" height="32" rx="8" fill="currentColor" fillOpacity="0.14" />
+      {/*
+        A pulse trace — the dashboard is "Pulse Pro", and a rising-then-settling
+        line is what a month of a register actually looks like.
+      */}
+      <path
+        d="M6 19.5h4.2l2.4-6.6 2.9 10.2 3.1-13 2.3 9.4 1.8-4h3.3"
+        stroke="currentColor"
+        strokeWidth="2.1"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

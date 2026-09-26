@@ -6,7 +6,7 @@ import { useEffect, useRef } from "react";
 
 import { ADMIN_NAV, NAV_ITEMS, type NavItem } from "@/components/shell/nav-items";
 import { ThemeToggle } from "@/components/theme/theme";
-import { RisebitMark } from "@/components/ui/brand";
+import { CfosmeMark } from "@/components/ui/brand";
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/ui/icons";
 import { cn } from "@/components/ui/primitives";
@@ -89,10 +89,10 @@ export function PortalShell({
 
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold tracking-tight text-heading sm:text-base">
-              CFO Dashboard
+              Pulse Pro
             </p>
             <p className="truncate text-xs text-muted-foreground">
-              {user.clientName ?? "RISEBIT CFO"} &middot; Management View
+              {user.clientName ?? "CFOSME"} &middot; Task Register
             </p>
           </div>
 
@@ -126,7 +126,7 @@ export function PortalShell({
           </main>
 
           <footer className="no-print px-4 pb-6 text-center text-xs text-muted-foreground sm:px-6">
-            RISEBIT CFO Dashboard &middot; Confidential management information
+            CFOSME Pulse Pro &middot; Confidential client information
           </footer>
         </div>
       </SidebarInset>
@@ -151,7 +151,7 @@ function PortalSidebar({
       <SidebarHeader className="gap-0">
         <Link
           href="/dashboard"
-          aria-label="RISEBIT CFO Dashboard"
+          aria-label="CFOSME Pulse Pro"
           className={cn(
             // 8px inside the panel, so it takes the panel's radius less 8px.
             "flex items-center gap-2.5 rounded-[var(--radius-inset-2)] py-2",
@@ -166,7 +166,7 @@ function PortalSidebar({
         >
           {/* Deliberately not a SidebarMenuButton: that forces every glyph
               inside it to 16px, which is what shrank the mark to a speck. */}
-          <RisebitMark size={32} className="w-8 shrink-0" />
+          <CfosmeMark size={32} className="w-8 shrink-0 text-sidebar-primary" />
           <span className={cn(
               "min-w-0 overflow-hidden text-xl leading-none font-extrabold tracking-wide whitespace-nowrap text-sidebar-foreground",
               "transition-[opacity,width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
@@ -174,13 +174,13 @@ function PortalSidebar({
               // invisible label holding the mark 5px off centre on the rail.
               "group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0",
             )}>
-            RISE<span className="text-sidebar-primary">BIT</span>
+            CFOS<span className="text-sidebar-primary">ME</span>
           </span>
         </Link>
       </SidebarHeader>
 
       <SidebarContent>
-        <NavGroup label="Modules" items={NAV_ITEMS} pathname={pathname} />
+        <NavGroup label="Views" items={NAV_ITEMS} pathname={pathname} />
         {user.isPlatformAdmin && (
           <NavGroup label="Administration" items={ADMIN_NAV} pathname={pathname} />
         )}
@@ -206,7 +206,7 @@ function PortalSidebar({
                   {user.name}
                 </span>
                 <span className="truncate text-xs text-sidebar-foreground/60">
-                  {user.clientName ?? "RISEBIT CFO"}
+                  {user.clientName ?? "CFOSME"}
                 </span>
               </span>
             </SidebarMenuButton>
@@ -237,7 +237,7 @@ function NavGroup({
         <SidebarMenu>
           {items.map((item) => {
             const Icon = Icons[item.icon];
-            // "/dashboard" must not stay active on "/dashboard/pnl".
+            // "/dashboard" must not stay active on "/dashboard/register".
             const active =
               pathname === item.href ||
               (item.href !== "/dashboard" &&

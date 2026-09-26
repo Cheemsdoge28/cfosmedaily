@@ -1,52 +1,47 @@
 /**
- * Plain-English labels for values the database and the Zoho API store in
- * their own shorthand.
+ * Plain-English labels for values the database stores in its own shorthand.
  *
- * These were being printed raw: an operator read "cron", "SUCCESS" and
- * "profitandloss, balancesheet, aragingsummary" — the identifiers a developer
- * chose, shown to someone running an accounting practice. The mapping lives in
- * one place so the two screens that show a sync history cannot disagree, and
- * anything unrecognised falls back to the raw value rather than vanishing.
+ * These were being printed raw: an operator read "PARTIAL", "import.success" and
+ * "NOT_STARTED" — the identifiers a developer chose, shown to someone running an
+ * accounting practice. The mapping lives in one place so two screens cannot
+ * disagree, and anything unrecognised falls back to the raw value rather than
+ * vanishing.
  */
 
-const SYNC_TRIGGERS: Record<string, string> = {
-  manual: "By hand",
-  cron: "Scheduled",
-};
-
-const SYNC_RESULTS: Record<string, string> = {
+const IMPORT_RESULTS: Record<string, string> = {
   SUCCESS: "Complete",
   PARTIAL: "Partly done",
   FAILED: "Failed",
   RUNNING: "Running",
 };
 
-const ZOHO_REPORTS: Record<string, string> = {
-  profitandloss: "Profit & Loss",
-  balancesheet: "Balance Sheet",
-  cashflow: "Cash Flow",
-  aragingsummary: "Receivables ageing",
-  apagingsummary: "Payables ageing",
+export function importResultLabel(status: string): string {
+  return IMPORT_RESULTS[status] ?? status;
+}
+
+const ROLES: Record<string, string> = {
+  PLATFORM_ADMIN: "CFOSME staff",
+  CLIENT_ADMIN: "Client administrator",
+  VIEWER: "Viewer — read-only",
 };
 
-export function syncTriggerLabel(trigger: string): string {
-  return SYNC_TRIGGERS[trigger] ?? trigger;
+export function roleLabel(role: string): string {
+  return ROLES[role] ?? role;
 }
 
-export function syncResultLabel(status: string): string {
-  return SYNC_RESULTS[status] ?? status;
-}
+const CHANGE_SOURCES: Record<string, string> = {
+  MANUAL: "Edited in the register",
+  IMPORT: "From a workbook import",
+};
 
-/** "Profit & Loss, Balance Sheet, Cash Flow" — or a dash when none ran. */
-export function reportsLabel(reports: string[]): string {
-  if (reports.length === 0) return "—";
-  return reports.map((report) => ZOHO_REPORTS[report] ?? report).join(", ");
+export function changeSourceLabel(source: string): string {
+  return CHANGE_SOURCES[source] ?? source;
 }
 
 /**
  * Audit actions, which are stored as dotted keys so they stay stable and
- * searchable. The log itself is read by people, not by a parser, so it shows
- * the sentence rather than the key.
+ * searchable. The log itself is read by people, not by a parser, so it shows the
+ * sentence rather than the key.
  */
 const AUDIT_ACTIONS: Record<string, string> = {
   "auth.login.success": "Signed in",
@@ -60,10 +55,11 @@ const AUDIT_ACTIONS: Record<string, string> = {
   "user.update": "Login updated",
   "user.deactivate": "Login deactivated",
   "user.password.reset": "Password reset",
-  "zoho.connect": "Zoho Books connected",
-  "zoho.disconnect": "Zoho Books disconnected",
-  "zoho.sync.start": "Import started",
-  "zoho.sync.failure": "Import failed",
+  "task.update": "Task moved",
+  "import.start": "Import started",
+  "import.success": "Import finished",
+  "import.failure": "Import failed",
+  "export.download": "Workbook downloaded",
 };
 
 export function auditActionLabel(action: string): string {

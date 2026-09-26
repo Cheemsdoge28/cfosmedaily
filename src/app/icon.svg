@@ -1,4 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2200 2200" width="2200" height="2200">
-  <rect width="2200" height="2200" rx="360" fill="#10233f"/>
-  <path fill="#d59b2a" d="M 1815.0 95.0 L 1420.0 445.0 L 1555.0 465.0 L 1560.0 485.0 L 1335.0 745.0 L 1115.0 965.0 L 715.0 1300.0 L 270.0 1610.0 L 275.0 1825.0 L 770.0 1510.0 L 960.0 1375.0 L 1200.0 1175.0 L 1410.0 965.0 L 1640.0 675.0 L 1640.0 1845.0 L 1510.0 1845.0 L 1505.0 1050.0 L 1305.0 1255.0 L 1305.0 1855.0 L 1195.0 1850.0 L 1185.0 1360.0 L 985.0 1525.0 L 985.0 1855.0 L 870.0 1850.0 L 865.0 1600.0 L 290.0 1970.0 L 275.0 1995.0 L 1825.0 1985.0 Z "/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!--
+    The favicon.
+
+    The same pulse trace as the sidebar mark, on the brand's deep ground: the
+    dashboard is "Pulse Pro", and a rising-then-settling line is what a month of
+    a register actually looks like.
+
+    Drawn for 16px, which is the size that decides everything. The stroke is
+    deliberately heavy (6 of 64, so 1.5px at 16) and the trace has only four
+    vertices — the wordmark's own six-peak version turns to mush at tab size,
+    and a logo nobody can resolve is just a coloured square. The colours are
+    sampled from the wordmark: the green carries the line, the blue marks the
+    peak, and both clear 4:1 on the ground behind them.
+  -->
+  <rect width="64" height="64" rx="14" fill="#0e3a4f"/>
+  <path
+    d="M10 38h7l6-16 9 22 5-12h7"
+    fill="none"
+    stroke="#87b54b"
+    stroke-width="6"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <circle cx="32" cy="44" r="4.5" fill="#22a3dc"/>
 </svg>

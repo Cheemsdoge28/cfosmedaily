@@ -9,22 +9,20 @@ import { recordAudit } from "@/lib/audit";
 import { requirePlatformAdmin } from "@/lib/auth/guard";
 import { hashPassword } from "@/lib/auth/password";
 import { revokeAllSessions } from "@/lib/auth/session";
-import {
-  buildFiscalYear,
-  buildFiscalYearSpan,
-  fiscalYearStartFor,
-} from "@/lib/admin/fiscal-years";
 import { INITIAL_ADMIN_STATE, type AdminState } from "@/lib/admin/types";
 import { prisma } from "@/lib/db";
-import { listOrganizations } from "@/lib/zoho/client";
-import { SyncInProgressError, syncClientFromZoho } from "@/lib/zoho/sync";
+import { importWorkbook } from "@/lib/tasks/import";
 
 /**
- * Administration actions — the onboarding flow.
+ * Administration actions.
  *
- * These replace the legacy SOP steps that asked an operator to hand-edit
- * config.php and paste in a bcrypt hash. Adding a client, giving its people
- * logins and pulling its figures from Zoho are now audited operations.
+ * Adding a client, giving its people logins, and bringing the workbook in are
+ * all audited operations rather than steps in a document someone follows by hand.
+ *
+ * Shorter than the portal this was forked from: clients no longer carry business
+ * units, fiscal years or a currency, because a task register needs none of them —
+ * a client is a name, a slug and the people who may sign in. Onboarding is
+ * correspondingly one form rather than four.
  */
 
 /** A readable but high-entropy temporary password (~80 bits). */
@@ -51,10 +49,7 @@ const clientSchema = z.object({
     .trim()
     .toLowerCase()
     .regex(/^[a-z0-9-]{2,40}$/, "Use lowercase letters, digits and hyphens only."),
-  currency: z.string().trim().length(3, "Use a 3-letter currency code.").toUpperCase(),
-  fiscalYearStartMonth: z.coerce.number().int().min(1).max(12),
-  businessUnits: z.string().trim().optional(),
-  historyYears: z.coerce.number().int().min(1).max(5).default(2),
+  legalName: z.string().trim().optional(),
   /** Optional: create the client's first login in the same step. */
   adminName: z.string().trim().optional(),
   adminEmail: z
@@ -63,12 +58,12 @@ const clientSchema = z.object({
 });
 
 /**
- * Creates a client complete enough to be usable:
- * business units, fiscal years, a Zoho connection row, and optionally the first
- * client-administrator login.
+ * Creates a client, and optionally the first login for it.
  *
- * Fiscal years matter here — without one the dashboard has nothing to resolve
- * its filters against and a Zoho sync refuses every month.
+ * Most clients arrive the other way round — the importer creates them from the
+ * workbook's Client column the first time it sees a name. This form is for the
+ * case the import cannot cover: a client who needs a login before any of their
+ * tasks exist, or one whose name in the workbook needs correcting.
  */
 export async function createClientAction(
   _prev: AdminState,
@@ -79,28 +74,29 @@ export async function createClientAction(
   const parsed = clientSchema.safeParse({
     name: formData.get("name"),
     slug: formData.get("slug"),
-    currency: formData.get("currency"),
-    fiscalYearStartMonth: formData.get("fiscalYearStartMonth"),
-    businessUnits: formData.get("businessUnits"),
-    historyYears: formData.get("historyYears"),
+    legalName: formData.get("legalName"),
     adminName: formData.get("adminName"),
     adminEmail: formData.get("adminEmail"),
   });
 
   if (!parsed.success) return fail(parsed.error.issues[0]!.message);
 
-  const {
-    name,
-    slug,
-    currency,
-    fiscalYearStartMonth,
-    historyYears,
-    adminName,
-    adminEmail,
-  } = parsed.data;
+  const { name, slug, legalName, adminName, adminEmail } = parsed.data;
 
   if (await prisma.client.findUnique({ where: { slug } })) {
     return fail(`The slug "${slug}" is already in use.`);
+  }
+
+  // The importer matches clients by name, so two clients with the same name
+  // would make every future upload ambiguous.
+  const sameName = await prisma.client.findFirst({
+    where: { name: { equals: name, mode: "insensitive" } },
+    select: { name: true },
+  });
+  if (sameName) {
+    return fail(
+      `"${sameName.name}" already exists. Workbook imports match on the client name, so two clients cannot share one.`,
+    );
   }
 
   // Both login fields or neither.
@@ -112,16 +108,6 @@ export async function createClientAction(
     return fail("That e-mail already has an account.");
   }
 
-  const units = (parsed.data.businessUnits ?? "")
-    .split(",")
-    .map((u) => u.trim())
-    .filter(Boolean);
-
-  const { years, currentLabel } = buildFiscalYearSpan({
-    startMonth: fiscalYearStartMonth,
-    back: historyYears - 1,
-  });
-
   const temporaryPassword = wantsLogin ? generateTemporaryPassword() : undefined;
   const passwordHash = temporaryPassword
     ? await hashPassword(temporaryPassword)
@@ -131,23 +117,7 @@ export async function createClientAction(
     data: {
       name,
       slug,
-      currency,
-      fiscalYearStartMonth,
-      businessUnits: {
-        create: (units.length ? units : ["Consolidated"]).map((unitName, index) => ({
-          name: unitName,
-          sortOrder: index,
-        })),
-      },
-      fiscalYears: {
-        create: years.map((fy) => ({
-          label: fy.label,
-          startDate: new Date(`${fy.startDate}T00:00:00Z`),
-          endDate: new Date(`${fy.endDate}T00:00:00Z`),
-          isCurrent: fy.label === currentLabel,
-        })),
-      },
-      zohoConnection: { create: {} },
+      legalName: legalName || null,
       ...(wantsLogin && passwordHash
         ? {
             users: {
@@ -168,7 +138,7 @@ export async function createClientAction(
     action: "client.create",
     userId: admin.id,
     clientId: client.id,
-    detail: `${name} (${slug}) — ${years.length} fiscal years, ${units.length || 1} unit(s)`,
+    detail: `${name} (${slug})`,
   });
 
   if (wantsLogin) {
@@ -187,128 +157,50 @@ export async function createClientAction(
     clientId: client.id,
     temporaryPassword,
     success: wantsLogin
-      ? `${name} created with ${years.length} fiscal years and a login for ${adminEmail}. Connect Zoho Books next.`
-      : `${name} created with ${years.length} fiscal years. Add a login next.`,
+      ? `${name} created, with a login for ${adminEmail}. Their tasks appear as soon as a workbook naming them is imported.`
+      : `${name} created. Their tasks appear as soon as a workbook naming them is imported.`,
+  };
+}
+
+/** Suspends a client, or brings one back. A suspended register is read-only. */
+export async function toggleClientActiveAction(
+  _prev: AdminState,
+  formData: FormData,
+): Promise<AdminState> {
+  const admin = await requirePlatformAdmin();
+
+  const clientId = String(formData.get("clientId") ?? "");
+  const client = await prisma.client.findUnique({ where: { id: clientId } });
+  if (!client) return fail("That client no longer exists.");
+
+  const isActive = !client.isActive;
+  await prisma.client.update({ where: { id: clientId }, data: { isActive } });
+
+  // Suspending a client must not leave its people holding live sessions.
+  if (!isActive) {
+    const users = await prisma.user.findMany({
+      where: { clientId },
+      select: { id: true },
+    });
+    for (const user of users) await revokeAllSessions(user.id);
+  }
+
+  await recordAudit({
+    action: "client.update",
+    userId: admin.id,
+    clientId,
+    detail: `${client.name} -> ${isActive ? "active" : "suspended"}`,
+  });
+
+  revalidatePath("/admin");
+  return {
+    ...INITIAL_ADMIN_STATE,
+    success: `${client.name} is now ${isActive ? "active" : "suspended"}.`,
   };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Business units and fiscal years
-// ─────────────────────────────────────────────────────────────────────────────
-
-export async function addBusinessUnitAction(
-  _prev: AdminState,
-  formData: FormData,
-): Promise<AdminState> {
-  const admin = await requirePlatformAdmin();
-
-  const clientId = String(formData.get("clientId") ?? "");
-  const name = String(formData.get("name") ?? "").trim();
-
-  if (!clientId || name.length < 2) return fail("Enter a business unit name.");
-
-  const existing = await prisma.businessUnit.findUnique({
-    where: { clientId_name: { clientId, name } },
-  });
-  if (existing) return fail(`"${name}" already exists for this client.`);
-
-  const count = await prisma.businessUnit.count({ where: { clientId } });
-
-  await prisma.businessUnit.create({
-    data: { clientId, name, sortOrder: count },
-  });
-
-  await recordAudit({
-    action: "client.update",
-    userId: admin.id,
-    clientId,
-    detail: `added business unit ${name}`,
-  });
-
-  revalidatePath(`/admin/clients/${clientId}`);
-  return { ...INITIAL_ADMIN_STATE, success: `Business unit "${name}" added.` };
-}
-
-/** Adds the fiscal year containing a given calendar year's start month. */
-export async function addFiscalYearAction(
-  _prev: AdminState,
-  formData: FormData,
-): Promise<AdminState> {
-  const admin = await requirePlatformAdmin();
-
-  const clientId = String(formData.get("clientId") ?? "");
-  const startYear = Number(formData.get("startYear"));
-
-  if (!clientId) return fail("No client selected.");
-  if (!Number.isInteger(startYear) || startYear < 2000 || startYear > 2100) {
-    return fail("Enter a year between 2000 and 2100.");
-  }
-
-  const client = await prisma.client.findUnique({ where: { id: clientId } });
-  if (!client) return fail("That client no longer exists.");
-
-  const fy = buildFiscalYear(startYear, client.fiscalYearStartMonth);
-
-  const existing = await prisma.fiscalYear.findUnique({
-    where: { clientId_label: { clientId, label: fy.label } },
-  });
-  if (existing) return fail(`${fy.label} already exists.`);
-
-  const currentStart = fiscalYearStartFor(new Date(), client.fiscalYearStartMonth);
-
-  await prisma.fiscalYear.create({
-    data: {
-      clientId,
-      label: fy.label,
-      startDate: new Date(`${fy.startDate}T00:00:00Z`),
-      endDate: new Date(`${fy.endDate}T00:00:00Z`),
-      isCurrent: startYear === currentStart,
-    },
-  });
-
-  await recordAudit({
-    action: "client.update",
-    userId: admin.id,
-    clientId,
-    detail: `added fiscal year ${fy.label}`,
-  });
-
-  revalidatePath(`/admin/clients/${clientId}`);
-  return { ...INITIAL_ADMIN_STATE, success: `${fy.label} added.` };
-}
-
-/** Marks one fiscal year as the default the dashboard opens on. */
-export async function setCurrentFiscalYearAction(
-  _prev: AdminState,
-  formData: FormData,
-): Promise<AdminState> {
-  const admin = await requirePlatformAdmin();
-
-  const clientId = String(formData.get("clientId") ?? "");
-  const fiscalYearId = String(formData.get("fiscalYearId") ?? "");
-  if (!clientId || !fiscalYearId) return fail("No fiscal year selected.");
-
-  const fy = await prisma.fiscalYear.findUnique({ where: { id: fiscalYearId } });
-  if (!fy || fy.clientId !== clientId) return fail("That fiscal year no longer exists.");
-
-  await prisma.$transaction([
-    prisma.fiscalYear.updateMany({ where: { clientId }, data: { isCurrent: false } }),
-    prisma.fiscalYear.update({ where: { id: fiscalYearId }, data: { isCurrent: true } }),
-  ]);
-
-  await recordAudit({
-    action: "client.update",
-    userId: admin.id,
-    clientId,
-    detail: `current fiscal year set to ${fy.label}`,
-  });
-
-  revalidatePath(`/admin/clients/${clientId}`);
-  return { ...INITIAL_ADMIN_STATE, success: `${fy.label} is now the default period.` };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Logins — a client may have as many as it needs
+// Logins
 // ─────────────────────────────────────────────────────────────────────────────
 
 const userSchema = z.object({
@@ -358,7 +250,6 @@ export async function createUserAction(
   });
 
   revalidatePath("/admin");
-  revalidatePath(`/admin/clients/${parsed.data.clientId}`);
 
   return {
     error: null,
@@ -384,7 +275,7 @@ export async function updateUserRoleAction(
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return fail("That user no longer exists.");
   if (user.role === "PLATFORM_ADMIN") {
-    return fail("Platform administrator accounts cannot be changed here.");
+    return fail("CFOSME staff accounts cannot be changed here.");
   }
 
   await prisma.user.update({ where: { id: userId }, data: { role } });
@@ -397,11 +288,12 @@ export async function updateUserRoleAction(
   });
 
   revalidatePath("/admin");
-  if (user.clientId) revalidatePath(`/admin/clients/${user.clientId}`);
 
   return {
     ...INITIAL_ADMIN_STATE,
-    success: `${user.email} is now a ${role === "CLIENT_ADMIN" ? "client administrator" : "viewer"}.`,
+    success: `${user.email} is now a ${
+      role === "CLIENT_ADMIN" ? "client administrator" : "viewer"
+    }.`,
   };
 }
 
@@ -440,7 +332,6 @@ export async function resetPasswordAction(
   });
 
   revalidatePath("/admin");
-  if (user.clientId) revalidatePath(`/admin/clients/${user.clientId}`);
 
   return {
     error: null,
@@ -475,7 +366,6 @@ export async function toggleUserActiveAction(
   });
 
   revalidatePath("/admin");
-  if (user.clientId) revalidatePath(`/admin/clients/${user.clientId}`);
 
   return {
     ...INITIAL_ADMIN_STATE,
@@ -484,121 +374,87 @@ export async function toggleUserActiveAction(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Zoho Books
+// Workbook import
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** 8 MB. The register is ~90 rows; a file far past this is not this workbook. */
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+
+const XLSX_TYPES = new Set([
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel.sheet.macroEnabled.12",
+  // Some browsers send nothing useful; the extension check below covers those.
+  "application/octet-stream",
+  "",
+]);
+
 /**
- * Binds one Zoho organization to the client.
+ * Takes the uploaded workbook and brings it into the register.
  *
- * The callback picks the first organization it can see, which is right for an
- * account with one. Where a firm's Zoho login can see several, this is how the
- * correct one gets chosen.
+ * The period matters and is asked for rather than assumed: the Due Date column
+ * holds values like "20th Sept" with no year, so the month the register is *for*
+ * is what resolves them. Defaulting it to the current month would mean the same
+ * file imported in October produced different deadlines than it did in September.
  */
-export async function setZohoOrganizationAction(
+export async function importWorkbookAction(
   _prev: AdminState,
   formData: FormData,
 ): Promise<AdminState> {
   const admin = await requirePlatformAdmin();
 
-  const clientId = String(formData.get("clientId") ?? "");
-  const organizationId = String(formData.get("organizationId") ?? "");
-  if (!clientId || !organizationId) return fail("Choose an organization.");
-
-  try {
-    const organizations = await listOrganizations(clientId);
-    const organization = organizations.find(
-      (o) => o.organization_id === organizationId,
-    );
-    if (!organization) return fail("That organization is no longer visible to this connection.");
-
-    await prisma.zohoConnection.update({
-      where: { clientId },
-      data: {
-        organizationId: organization.organization_id,
-        organizationName: organization.name,
-        lastError: null,
-      },
-    });
-
-    await recordAudit({
-      action: "zoho.connect",
-      userId: admin.id,
-      clientId,
-      detail: `organization set to ${organization.name}`,
-    });
-
-    revalidatePath(`/admin/clients/${clientId}`);
-    revalidatePath("/admin/integrations");
-    return {
-      ...INITIAL_ADMIN_STATE,
-      success: `Linked to ${organization.name}. Run a sync to pull its figures.`,
-    };
-  } catch (error) {
-    return fail(
-      error instanceof Error ? error.message : "Could not reach Zoho Books.",
-    );
+  const file = formData.get("workbook");
+  if (!(file instanceof File) || file.size === 0) {
+    return fail("Choose the CFOSME_Task_Tracker.xlsx file to upload.");
   }
-}
-
-/** Parses a "YYYY-MM" month input into a UTC date at the first of the month. */
-function parseMonth(value: FormDataEntryValue | null): Date | undefined {
-  const text = String(value ?? "").trim();
-  if (!/^\d{4}-\d{2}$/.test(text)) return undefined;
-  return new Date(`${text}-01T00:00:00Z`);
-}
-
-/**
- * Pulls figures from Zoho Books for an explicit period.
- *
- * A range matters on first import: a new client usually wants two full fiscal
- * years so the dashboard has a prior year to compare against, where the routine
- * nightly job only needs recent months.
- */
-export async function runZohoSyncAction(
-  _prev: AdminState,
-  formData: FormData,
-): Promise<AdminState> {
-  const admin = await requirePlatformAdmin();
-
-  const clientId = String(formData.get("clientId") ?? "");
-  if (!clientId) return fail("No client selected.");
-
-  const from = parseMonth(formData.get("from"));
-  const to = parseMonth(formData.get("to"));
-
-  if (from && to && from > to) {
-    return fail("The start month must not be after the end month.");
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return fail("That file is larger than 8 MB — check it is the task tracker workbook.");
+  }
+  if (!XLSX_TYPES.has(file.type) && !/\.xlsx?$/i.test(file.name)) {
+    return fail("That is not an Excel workbook (.xlsx).");
   }
 
-  let result;
-  try {
-    result = await syncClientFromZoho({
-      clientId,
-      trigger: "manual",
-      userId: admin.id,
-      from,
-      to,
-    });
-  } catch (error) {
-    // A second click, or a manual run landing on top of the nightly job.
-    if (error instanceof SyncInProgressError) return fail(error.message);
-    throw error;
+  const period = String(formData.get("period") ?? "").trim();
+  if (!/^\d{4}-\d{2}$/.test(period)) {
+    return fail("Choose the month this workbook covers.");
+  }
+  const [year, month] = period.split("-").map(Number);
+  if (!year || !month || month < 1 || month > 12) {
+    return fail("Choose the month this workbook covers.");
   }
 
-  revalidatePath(`/admin/clients/${clientId}`);
-  revalidatePath("/admin/integrations");
+  const outcome = await importWorkbook({
+    buffer: await file.arrayBuffer(),
+    fileName: file.name,
+    userId: admin.id,
+    context: { year, month },
+  });
+
+  revalidatePath("/admin/import");
+  revalidatePath("/admin");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/register");
 
-  if (result.status === "FAILED") {
-    return fail(result.errors[0] ?? "The sync failed. Check the connection status.");
+  if (outcome.status === "FAILED") {
+    return fail(outcome.errors[0] ?? "The workbook could not be imported.");
   }
 
-  const tail = result.errors.length
-    ? ` ${result.errors.length} period(s) reported problems — see the sync history.`
+  const parts = [
+    `${outcome.created} created`,
+    `${outcome.updated} updated`,
+    `${outcome.unchanged} unchanged`,
+  ];
+  if (outcome.skipped) parts.push(`${outcome.skipped} skipped`);
+
+  const newClients = outcome.clientsCreated.length
+    ? ` New client${outcome.clientsCreated.length === 1 ? "" : "s"}: ${outcome.clientsCreated.join(", ")}.`
+    : "";
+
+  const caveat = outcome.skipped
+    ? " The rows it could not read are listed below — fix them in the workbook and upload again."
     : "";
 
   return {
     ...INITIAL_ADMIN_STATE,
-    success: `Sync ${result.status.toLowerCase()}: ${result.monthsProcessed} months, ${result.recordsWritten} records written.${tail} Check the figures against Zoho before telling the client.`,
+    success: `${file.name}: ${parts.join(", ")}.${newClients}${caveat}`,
   };
 }

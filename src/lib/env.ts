@@ -5,37 +5,24 @@ import { z } from "zod";
 /**
  * Validated server environment.
  *
- * Parsed lazily so that `next build` can compile pages without a database or
- * Zoho credentials present; anything that actually touches those values calls
- * `serverEnv()` at request time and fails loudly if configuration is missing.
+ * Parsed lazily so that `next build` can compile pages without a database
+ * present; anything that actually touches a value calls `serverEnv()` at request
+ * time and fails loudly if configuration is missing.
+ *
+ * Shorter than it was. The portal this was forked from stored Zoho OAuth tokens,
+ * so it required an AES key and a cron secret to protect them. Nothing here
+ * holds a third-party credential — the register arrives as a spreadsheet an
+ * operator uploads — so those variables are gone rather than left unused, which
+ * is one fewer secret to rotate and one fewer way to misconfigure a deployment.
  */
 
 const schema = z.object({
-  NODE_ENV: z
-    .enum(["development", "test", "production"])
-    .default("development"),
+  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   DIRECT_URL: z.string().optional(),
 
-  /** base64-encoded 32-byte key for AES-256-GCM. Generate with `npm run keygen`. */
-  APP_ENCRYPTION_KEY: z
-    .string()
-    .min(1, "APP_ENCRYPTION_KEY is required")
-    .refine(
-      (value) => Buffer.from(value, "base64").length === 32,
-      "APP_ENCRYPTION_KEY must be a base64-encoded 32-byte key",
-    ),
-
-  CRON_SECRET: z.string().min(16).optional(),
-
   APP_URL: z.string().url().default("http://localhost:3000"),
-
-  ZOHO_CLIENT_ID: z.string().optional(),
-  ZOHO_CLIENT_SECRET: z.string().optional(),
-  ZOHO_REGION: z
-    .enum(["com", "in", "eu", "au", "jp", "ca", "sa"])
-    .default("in"),
 });
 
 export type ServerEnv = z.infer<typeof schema>;
@@ -64,13 +51,4 @@ export function serverEnv(): ServerEnv {
 export function isSecureOrigin(): boolean {
   const url = process.env.APP_URL ?? "http://localhost:3000";
   return url.startsWith("https://");
-}
-
-/** Zoho accounts/API hosts differ per data centre. */
-export function zohoHosts(region: string) {
-  const domain = region === "com" ? "com" : region;
-  return {
-    accounts: `https://accounts.zoho.${domain}`,
-    books: `https://www.zohoapis.${domain}/books/v3`,
-  };
 }

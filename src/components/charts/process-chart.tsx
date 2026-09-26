@@ -1,0 +1,120 @@
+"use client";
+
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  LabelList,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+
+import {
+  AXIS_FONT,
+  tooltipLabelStyle,
+  tooltipStyle,
+  useChartPalette,
+} from "@/components/charts/chart-tokens";
+import type { GroupRollup } from "@/lib/tasks/types";
+
+/**
+ * Where the month's work is concentrated.
+ *
+ * One series, so there is no legend: the card title names what the bars count,
+ * and a legend box for a single measure is furniture. Each bar carries its figure
+ * directly instead, which is what a reader would otherwise get by squinting at the
+ * axis.
+ *
+ * One hue throughout. Process names are nominal — Accounting is not more or less
+ * than Compliance — so painting each bar a different colour would imply a
+ * categorical scheme that means nothing and would cost the six reserved hues.
+ */
+export function ProcessChart({ data }: { data: GroupRollup[] }) {
+  const palette = useChartPalette();
+
+  if (data.length === 0) {
+    return (
+      <p className="py-20 text-center text-sm text-muted-foreground">
+        No tasks match the current filters.
+      </p>
+    );
+  }
+
+  const MAX_BARS = 8;
+  const sorted = [...data].sort((a, b) => b.total - a.total);
+
+  // Past the cap the tail becomes one bar rather than a chart nobody can read.
+  const rows =
+    sorted.length <= MAX_BARS
+      ? sorted
+      : [
+          ...sorted.slice(0, MAX_BARS - 1),
+          {
+            key: "other",
+            label: `Other (${sorted.length - MAX_BARS + 1})`,
+            total: sorted
+              .slice(MAX_BARS - 1)
+              .reduce((sum, row) => sum + row.total, 0),
+            done: 0,
+            open: 0,
+            overdue: 0,
+            completion: 0,
+          },
+        ];
+
+  const height = Math.max(160, rows.length * 34 + 40);
+
+  return (
+    <div className="w-full" style={{ height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          data={rows}
+          layout="vertical"
+          margin={{ top: 4, right: 30, bottom: 0, left: 0 }}
+          barCategoryGap="26%"
+        >
+          <CartesianGrid stroke={palette.grid} strokeWidth={1} horizontal={false} />
+          <XAxis
+            type="number"
+            allowDecimals={false}
+            tick={{ fill: palette.tick, fontSize: AXIS_FONT }}
+            tickLine={false}
+            axisLine={{ stroke: palette.grid }}
+          />
+          <YAxis
+            type="category"
+            dataKey="label"
+            width={128}
+            tick={{ fill: palette.tick, fontSize: AXIS_FONT }}
+            tickLine={false}
+            axisLine={false}
+          />
+          <Tooltip
+            cursor={{ fill: "currentColor", fillOpacity: 0.05 }}
+            contentStyle={tooltipStyle(palette)}
+            labelStyle={tooltipLabelStyle(palette)}
+            formatter={(value) => [`${Number(value)} tasks`, "Tasks"]}
+          />
+          <Bar
+            dataKey="total"
+            fill={palette.series[0]}
+            radius={[0, 4, 4, 0]}
+            maxBarSize={22}
+            animationDuration={520}
+            animationEasing="ease-out"
+          >
+            <LabelList
+              dataKey="total"
+              position="right"
+              offset={8}
+              className="fill-muted-foreground"
+              style={{ fontSize: 11, fontWeight: 600 }}
+            />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}

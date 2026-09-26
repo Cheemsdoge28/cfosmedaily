@@ -40,55 +40,59 @@ export const Icons = {
       <path d="m7 15 4-4 3 2 5-6" />
     </Svg>
   ),
-  cash: (p: IconProps) => (
-    <Svg {...p}>
-      <path d="M12 3v14M7 12l5 5 5-5" />
-      <path d="M5 21h14" />
-    </Svg>
-  ),
-  receivable: (p: IconProps) => (
-    <Svg {...p}>
-      <circle cx="8" cy="8" r="4" />
-      <path d="M2.5 19c.8-3 2.7-4.5 5.5-4.5s4.7 1.5 5.5 4.5" />
-      <path d="M14 8h7M17 5l4 3-4 3" />
-    </Svg>
-  ),
-  payable: (p: IconProps) => (
-    <Svg {...p}>
-      <circle cx="8" cy="8" r="4" />
-      <path d="M2.5 19c.8-3 2.7-4.5 5.5-4.5s4.7 1.5 5.5 4.5" />
-      <path d="M21 8h-7M18 5l-4 3 4 3" />
-    </Svg>
-  ),
-  bank: (p: IconProps) => (
-    <Svg {...p}>
-      <path d="M3 9h18M4 9v10M8 9v10M16 9v10M20 9v10M2 19h20M12 4l8 5H4l8-5Z" />
-    </Svg>
-  ),
   report: (p: IconProps) => (
     <Svg {...p}>
       <path d="M5 3h10l4 4v14H5z" />
       <path d="M15 3v5h5M8 12h8M8 16h8M8 8h4" />
     </Svg>
   ),
-  coins: (p: IconProps) => (
+  check: (p: IconProps) => (
     <Svg {...p}>
-      <ellipse cx="8" cy="7" rx="5" ry="2.5" />
-      <path d="M3 7v4c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5" />
-      <ellipse cx="16" cy="12" rx="5" ry="2.5" />
-      <path d="M11 12v4c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5v-4" />
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="m8.2 12.2 2.6 2.6 5-5.4" />
+    </Svg>
+  ),
+  alert: (p: IconProps) => (
+    <Svg {...p}>
+      <path d="M12 4.5 2.8 20h18.4L12 4.5Z" />
+      <path d="M12 10v4.2M12 17.2v.1" />
+    </Svg>
+  ),
+  overdue: (p: IconProps) => (
+    <Svg {...p}>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 7.5v4.8l3 1.9" />
+      <path d="M19.6 4.4 21.8 6.6" />
+    </Svg>
+  ),
+  list: (p: IconProps) => (
+    <Svg {...p}>
+      <path d="M9 6h11M9 12h11M9 18h11" />
+      <path d="M4.5 6h.1M4.5 12h.1M4.5 18h.1" />
+    </Svg>
+  ),
+  upload: (p: IconProps) => (
+    <Svg {...p}>
+      <path d="M12 16V4M8.5 7.5 12 4l3.5 3.5" />
+      <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />
+    </Svg>
+  ),
+  download: (p: IconProps) => (
+    <Svg {...p}>
+      <path d="M12 4v12M8.5 12.5 12 16l3.5-3.5" />
+      <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />
+    </Svg>
+  ),
+  calendar: (p: IconProps) => (
+    <Svg {...p}>
+      <rect x="3.5" y="5.5" width="17" height="15" rx="1.5" />
+      <path d="M3.5 10h17M8 3.5v4M16 3.5v4" />
     </Svg>
   ),
   gear: (p: IconProps) => (
     <Svg {...p}>
       <circle cx="12" cy="12" r="3.1" />
       <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1" />
-    </Svg>
-  ),
-  trendUp: (p: IconProps) => (
-    <Svg {...p}>
-      <path d="M4 17l6-6 4 3 6-7" />
-      <path d="M15 7h5v5" />
     </Svg>
   ),
   target: (p: IconProps) => (

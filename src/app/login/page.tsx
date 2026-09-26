@@ -32,7 +32,7 @@ export default async function LoginPage() {
       footer={
         <Note>
           Access is restricted to authorised users. If you need
-          credentials, contact your RISEBIT CFO engagement lead.
+          credentials, contact your CFOSME engagement lead.
         </Note>
       }
     >

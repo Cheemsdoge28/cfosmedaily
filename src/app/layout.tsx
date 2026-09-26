@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 
 import { THEME_INIT_SCRIPT, ThemeProvider } from "@/components/theme/theme";
 
@@ -10,11 +11,11 @@ const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: {
-    default: "RISEBIT CFO Dashboard",
-    template: "%s · RISEBIT CFO",
+    default: "CFOSME Pulse Pro",
+    template: "%s · CFOSME Pulse Pro",
   },
   description:
-    "Secure multi-client CFO dashboard portal — profitability, liquidity and working capital at a management level.",
+    "CFOSME's task register — client delivery, workload, deadlines and completion at a management level.",
   robots: { index: false, follow: false },
 };
 
@@ -27,9 +28,14 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // The nonce the proxy minted for this request. Next stamps it onto the
+  // scripts it emits itself; this one is ours, so it has to be passed by hand.
+  // Absent in dev, where the policy allows inline scripts outright.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     // suppressHydrationWarning: the script below stamps data-theme before React
     // hydrates, so the server's markup and the client's differ by design.
@@ -40,6 +46,7 @@ export default function RootLayout({
           Inline because anything fetched would be too late to matter.
         */}
         <script
+          nonce={nonce}
           dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
         />
       </head>

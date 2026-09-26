@@ -1,8 +1,8 @@
 {
-  "name": "risebit-cfo-dashboard",
+  "name": "cfosme-pulse-pro",
   "version": "2.0.0",
   "private": true,
-  "description": "RISEBIT CFO — multi-client CFO dashboard portal (Next.js + TypeScript + Prisma/PostgreSQL + Zoho Books).",
+  "description": "CFOSME Pulse Pro — multi-client task register and executive dashboard (Next.js + TypeScript + Prisma/PostgreSQL + Excel round trip).",
   "engines": {
     "node": ">=20.11"
   },
@@ -24,7 +24,9 @@
     "db:reset": "prisma migrate reset --force",
     "setup": "prisma generate && prisma migrate deploy && tsx prisma/seed.ts",
     "keygen": "tsx scripts/keygen.ts",
-    "hash": "tsx scripts/hash-password.ts"
+    "hash": "tsx scripts/hash-password.ts",
+    "check": "tsx --conditions=react-server scripts/check-logic.ts",
+    "check:workbook": "tsx --conditions=react-server scripts/check-workbook.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

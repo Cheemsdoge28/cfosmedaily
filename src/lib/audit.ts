@@ -5,8 +5,9 @@ import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
 
 /**
- * Append-only audit trail. Covers the events the SOP asks to be able to trace:
- * sign-ins, password changes, user administration and every Zoho sync.
+ * Append-only audit trail. Covers the events the runbook asks to be able to
+ * trace: sign-ins, password changes, user administration, every workbook import
+ * and every move a task makes.
  */
 
 export type AuditAction =
@@ -21,11 +22,11 @@ export type AuditAction =
   | "user.deactivate"
   | "client.create"
   | "client.update"
-  | "zoho.connect"
-  | "zoho.disconnect"
-  | "zoho.sync.start"
-  | "zoho.sync.success"
-  | "zoho.sync.failure";
+  | "task.update"
+  | "import.start"
+  | "import.success"
+  | "import.failure"
+  | "export.download";
 
 export async function recordAudit(input: {
   action: AuditAction;

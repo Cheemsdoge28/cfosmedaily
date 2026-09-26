@@ -2,13 +2,13 @@
  * The pre-paint theme script.
  *
  * Kept in a plain module with no React or server imports so that
- * next.config.ts can import it too: the Content-Security-Policy pins this
- * script by SHA-256 hash rather than relaxing script-src to 'unsafe-inline'.
- * Editing the string therefore changes the hash automatically, and the two can
- * never drift apart.
+ * src/lib/security-headers.ts can import it from the Edge proxy: the
+ * Content-Security-Policy pins this script by SHA-256 hash rather than relaxing
+ * script-src to 'unsafe-inline'. Editing the string therefore changes the hash
+ * automatically, and the two can never drift apart.
  */
 
-export const THEME_STORAGE_KEY = "risebit-theme";
+export const THEME_STORAGE_KEY = "cfosme-theme";
 
 export const THEME_INIT_SCRIPT = `(function(){try{var k=${JSON.stringify(
   THEME_STORAGE_KEY,

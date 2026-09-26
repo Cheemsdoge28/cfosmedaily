@@ -22,6 +22,24 @@ for (const file of [".env.local", ".env"]) {
   }
 }
 
+/**
+ * The unpooled connection, under whichever name the environment supplies it.
+ *
+ * Neon's own Vercel integration writes `DATABASE_URL_UNPOOLED` and
+ * `POSTGRES_URL_NON_POOLING`; `DIRECT_URL` is this project's documented name.
+ * Any of them is the same endpoint, and migrations need one of them — the
+ * pooled host cannot run the DDL `prisma migrate` issues. Falling back through
+ * the list means a .env pasted straight out of Neon works untouched.
+ */
+const UNPOOLED_KEYS = [
+  "DIRECT_URL",
+  "DATABASE_URL_UNPOOLED",
+  "POSTGRES_URL_NON_POOLING",
+] as const;
+
+const migrationUrlKey =
+  UNPOOLED_KEYS.find((key) => process.env[key]) ?? "DATABASE_URL";
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
@@ -30,13 +48,12 @@ export default defineConfig({
   datasource: {
     /**
      * CLI only — `prisma migrate`, `db push`, `studio` and the seed run through
-     * this. It deliberately prefers DIRECT_URL: Neon's pooled endpoint cannot
-     * run the DDL that migrations issue. It falls back to DATABASE_URL so a
-     * single-URL setup still works.
+     * this. It deliberately prefers an unpooled URL, and falls back to
+     * DATABASE_URL so a single-URL setup still works.
      *
      * The application itself never reads this. At runtime src/lib/db.ts opens
      * the pooled DATABASE_URL through the Postgres driver adapter.
      */
-    url: process.env.DIRECT_URL ? env("DIRECT_URL") : env("DATABASE_URL"),
+    url: env(migrationUrlKey),
   },
 });

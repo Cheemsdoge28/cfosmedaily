@@ -16,7 +16,7 @@ import {
   Tr,
 } from "@/components/ui/primitives";
 import { requireUser } from "@/lib/auth/guard";
-import { formatDateTime } from "@/lib/finance/format";
+import { formatDateTime } from "@/lib/tasks/format";
 import { prisma } from "@/lib/db";
 
 export const metadata: Metadata = { title: "Account" };
@@ -41,7 +41,7 @@ export default async function AccountPage() {
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
             <Detail label="Name" value={user.name} />
             <Detail label="E-mail" value={user.email} />
-            <Detail label="Client" value={user.clientName ?? "RISEBIT CFO"} />
+            <Detail label="Client" value={user.clientName ?? "CFOSME"} />
             <Detail label="Role" value={ROLE_LABELS[user.role] ?? user.role} />
           </dl>
         </Card>
@@ -83,7 +83,7 @@ export default async function AccountPage() {
 }
 
 const ROLE_LABELS: Record<string, string> = {
-  PLATFORM_ADMIN: "RISEBIT platform administrator",
+  PLATFORM_ADMIN: "CFOSME staff — reads every client",
   CLIENT_ADMIN: "Client administrator",
   VIEWER: "Viewer",
 };

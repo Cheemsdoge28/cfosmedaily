@@ -17,7 +17,7 @@ import type { Role } from "@/generated/prisma/enums";
  *   idle      —  2 hours without a request
  */
 
-export const SESSION_COOKIE = "risebit_session";
+export const SESSION_COOKIE = "cfosme_session";
 
 const ABSOLUTE_LIFETIME_MS = 12 * 60 * 60 * 1000;
 const IDLE_TIMEOUT_MS = 2 * 60 * 60 * 1000;
@@ -32,7 +32,6 @@ export type SessionUser = {
   clientId: string | null;
   clientName: string | null;
   clientSlug: string | null;
-  currency: string;
   mustChangePassword: boolean;
 };
 
@@ -118,7 +117,6 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     clientId: user.clientId,
     clientName: user.client?.name ?? null,
     clientSlug: user.client?.slug ?? null,
-    currency: user.client?.currency ?? "INR",
     mustChangePassword: user.mustChangePassword,
   };
 }

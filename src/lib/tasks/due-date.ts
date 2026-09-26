@@ -89,12 +89,16 @@ export function resolveDueDate(
   // An Excel date cell arrives already parsed.
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) return { date: null, text: null };
-    // Excel dates come through at local midnight; re-anchor to UTC midnight so
-    // a timezone west of Greenwich cannot shift every deadline back a day.
+    // Read with UTC getters, not local ones. ExcelJS hands back a date at UTC
+    // midnight (2026-09-08T00:00:00.000Z for the cell "8 Sep 2026"), so
+    // `getDate()` on a machine west of Greenwich reports the 7th and every dated
+    // task in the register silently moves back a day. It happens to be harmless
+    // on Vercel, which runs at UTC — which is exactly how a bug like this
+    // survives to production and then only shows up on someone's laptop.
     const date = utcDate(
-      value.getFullYear(),
-      value.getMonth() + 1,
-      value.getDate(),
+      value.getUTCFullYear(),
+      value.getUTCMonth() + 1,
+      value.getUTCDate(),
     );
     return { date, text: null };
   }

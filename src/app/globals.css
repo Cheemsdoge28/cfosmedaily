@@ -5,13 +5,19 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * RISEBIT CFO design tokens.
+ * CFOSME Pulse Pro design tokens.
  *
  * shadcn's token names are the single source of truth — they are simply given
- * RISEBIT's values rather than the stock neutral greys, so every shadcn
+ * CFOSME's values rather than the stock neutral greys, so every shadcn
  * component inherits the brand without being restyled one by one. The few
  * app-specific tokens below (chrome, status tones, chart colours) are the ones
  * shadcn has no equivalent for.
+ *
+ * The brand values are taken from the CFOSME wordmark itself rather than chosen:
+ * sampling it gives a green (#87b54b) and a blue (#22a3dc), which are the two
+ * accents below. The chrome is a deep step of that blue's own hue — the wordmark
+ * has no dark tone of its own, and the sidebar needs a ground that carries white
+ * type (12.1:1) and the green accent (5.0:1).
  *
  * Dark mode keys off `.dark`, shadcn's convention. The theme script stamps both
  * that class and `data-theme`, the latter being what the charts read to pick
@@ -30,39 +36,43 @@
   --popover: #ffffff;
   --popover-foreground: #1d2939;
 
-  --primary: #10233f;
+  --primary: #0e3a4f;
   --primary-foreground: #ffffff;
   --secondary: #f1f5f9;
-  --secondary-foreground: #10233f;
+  --secondary-foreground: #0e3a4f;
   --muted: #f8fafc;
   --muted-foreground: #667085;
   --accent: #f1f5f9;
-  --accent-foreground: #10233f;
+  --accent-foreground: #0e3a4f;
   --destructive: #d64545;
 
   --border: #e5e7eb;
   --input: #d0d5dd;
-  --ring: #c8a24a;
+  --ring: #6f9c36;
 
-  --sidebar: #10233f;
+  --sidebar: #0e3a4f;
   --sidebar-foreground: #ffffff;
-  --sidebar-primary: #c8a24a;
-  --sidebar-primary-foreground: #10233f;
+  --sidebar-primary: #87b54b;
+  --sidebar-primary-foreground: #0e3a4f;
   --sidebar-accent: rgb(255 255 255 / 0.14);
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: rgb(255 255 255 / 0.10);
-  --sidebar-ring: #c8a24a;
+  --sidebar-ring: #6f9c36;
 
-  /* Brand — fixed in both themes. */
-  --brand-navy: #10233f;
-  --brand-navy-600: #19365c;
-  --brand-navy-800: #0d1f38;
-  --brand-gold: #c8a24a;
+  /* Brand — fixed in both themes, sampled from the wordmark. */
+  --brand-green: #87b54b;
+  --brand-blue: #22a3dc;
+  /* The chrome, and the two stops of the signed-out gradient. */
+  --brand-deep: #0e3a4f;
+  --brand-deep-600: #16506b;
+  --brand-deep-800: #0a2c3d;
+  /* The green, stepped until it clears 3:1 on white as a focus ring. */
+  --brand-focus: #6f9c36;
 
   /* App surfaces shadcn has no name for. */
   --surface-2: #f8fafc;
   --surface-3: #f1f5f9;
-  --heading: #10233f;
+  --heading: #0e3a4f;
   --line-strong: #d0d5dd;
 
   /* Status. */
@@ -112,7 +122,7 @@
   --popover: #1a2438;
   --popover-foreground: #e8edf5;
 
-  --primary: #2b5ea8;
+  --primary: #17709b;
   --primary-foreground: #ffffff;
   --secondary: #1a2438;
   --secondary-foreground: #e8edf5;
@@ -124,9 +134,9 @@
 
   --border: #263349;
   --input: #33425c;
-  --ring: #c8a24a;
+  --ring: #6f9c36;
 
-  --sidebar: #0d1626;
+  --sidebar: #0a2c3d;
   --sidebar-foreground: #ffffff;
   --sidebar-accent: rgb(255 255 255 / 0.10);
   --sidebar-border: rgb(255 255 255 / 0.08);
@@ -211,10 +221,11 @@
   --color-heading: var(--heading);
   --color-line: var(--border);
   --color-line-strong: var(--line-strong);
-  --color-navy: var(--brand-navy);
-  --color-navy-600: var(--brand-navy-600);
-  --color-navy-800: var(--brand-navy-800);
-  --color-gold: var(--brand-gold);
+  --color-chrome: var(--brand-deep);
+  --color-chrome-600: var(--brand-deep-600);
+  --color-chrome-800: var(--brand-deep-800);
+  --color-brand-green: var(--brand-green);
+  --color-brand-blue: var(--brand-blue);
   --color-positive: var(--positive);
   --color-negative: var(--negative);
   --color-caution: var(--caution);
@@ -268,7 +279,7 @@
 
   /* Keyboard focus is always visible — the legacy page removed outlines. */
   :focus-visible {
-    outline: 2px solid var(--brand-gold);
+    outline: 2px solid var(--brand-focus);
     outline-offset: 2px;
   }
 
@@ -422,12 +433,12 @@
   }
 
   /*
-   * The navy chrome.
+   * The deep chrome.
    *
    * Deliberately NOT translucent. Glass earns its place where content passes
    * beneath a layer; the sidebar sits beside the content and nothing ever
    * travels under it, so transparency bought nothing here and cost the brand
-   * navy — mixed with the light page ground it came out a washed blue-grey.
+   * colour — mixed with the light page ground it came out a washed blue-grey.
    * What it keeps from the material is the part that was doing real work: the
    * specular edge and the depth shadow that lift it off the page.
    */
@@ -484,7 +495,7 @@
   }
 
   /* Content settling in, used on cards and rows as they mount. */
-  @keyframes risebit-rise {
+  @keyframes cfosme-rise {
     from {
       opacity: 0;
       transform: translateY(6px);
@@ -496,11 +507,11 @@
   }
 
   .animate-rise {
-    animation: risebit-rise 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: cfosme-rise 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   /* Numbers that change when a filter changes. */
-  @keyframes risebit-fade {
+  @keyframes cfosme-fade {
     from {
       opacity: 0;
     }
@@ -510,7 +521,7 @@
   }
 
   .animate-figure {
-    animation: risebit-fade 0.28s ease-out both;
+    animation: cfosme-fade 0.28s ease-out both;
   }
 }
 
