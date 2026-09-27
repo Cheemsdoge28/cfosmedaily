@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { categoryTick } from "@/components/charts/axis";
 import {
   AXIS_FONT,
   tooltipLabelStyle,
@@ -69,6 +70,10 @@ export function ProcessChart({ data }: { data: GroupRollup[] }) {
 
   const height = Math.max(160, rows.length * 34 + 40);
 
+  // Process names are the practice's own wording and run long — "Sales Report &
+  // Budget Vs Actuals report" is one of them — so the ticks are drawn as single
+  // lines and clipped. See categoryTick for why truncation alone was not enough.
+
   return (
     <div className="w-full" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
@@ -89,8 +94,11 @@ export function ProcessChart({ data }: { data: GroupRollup[] }) {
           <YAxis
             type="category"
             dataKey="label"
-            width={128}
-            tick={{ fill: palette.tick, fontSize: AXIS_FONT }}
+            width={150}
+            // Every category gets a tick: Recharts otherwise drops some when it
+            // thinks they will not fit, which on a bar chart leaves unlabelled bars.
+            interval={0}
+            tick={categoryTick({ fill: palette.tick, maxChars: 20 })}
             tickLine={false}
             axisLine={false}
           />
@@ -98,6 +106,8 @@ export function ProcessChart({ data }: { data: GroupRollup[] }) {
             cursor={{ fill: "currentColor", fillOpacity: 0.05 }}
             contentStyle={tooltipStyle(palette)}
             labelStyle={tooltipLabelStyle(palette)}
+            // The label is the full process name, so the tooltip is where a
+            // truncated tick becomes readable again.
             formatter={(value) => [`${Number(value)} tasks`, "Tasks"]}
           />
           <Bar

@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { categoryTick } from "@/components/charts/axis";
 import {
   AXIS_FONT,
   tooltipLabelStyle,
@@ -76,8 +77,11 @@ export function WorkloadChart({ data }: { data: GroupRollup[] }) {
           <YAxis
             type="category"
             dataKey="label"
-            width={116}
-            tick={{ fill: palette.tick, fontSize: AXIS_FONT }}
+            width={132}
+            interval={0}
+            // Same reason as the process chart: a wrapped category label is not
+            // given room by Recharts, so a long name overlaps the row below.
+            tick={categoryTick({ fill: palette.tick, maxChars: 17 })}
             tickLine={false}
             axisLine={false}
           />

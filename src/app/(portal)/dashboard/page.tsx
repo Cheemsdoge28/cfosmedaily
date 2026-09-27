@@ -120,7 +120,7 @@ export default async function DashboardPage({
         </Card>
 
         <Card title="Due date watch" description="Open tasks by urgency">
-          <DueWatch totals={totals} tasks={upcoming(tasks)} />
+          <DueWatch totals={totals} tasks={upcoming(tasks, 5)} />
         </Card>
       </Row>
     </ModuleFrame>
