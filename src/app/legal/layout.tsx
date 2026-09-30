@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { CfosmeWordmark } from "@/components/ui/brand";
-import { POLICY_UPDATED, SITE_NAME } from "@/lib/site";
+import { SITE_DETAILS, SITE_NAME } from "@/lib/site";
 
 /**
  * The frame the legal documents sit in.
@@ -63,7 +63,10 @@ export default function LegalLayout({
             </Link>
           </nav>
           <p className="mt-4 text-xs text-muted-foreground">
-            {SITE_NAME} · Last reviewed {POLICY_UPDATED}
+            {SITE_NAME} ·{" "}
+            {SITE_DETAILS.reviewedOn
+              ? `Last reviewed ${SITE_DETAILS.reviewedOn}`
+              : "These documents are a draft and have not been reviewed"}
           </p>
         </div>
       </footer>

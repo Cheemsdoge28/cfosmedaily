@@ -1,4 +1,60 @@
-import { POLICY_UPDATED } from "@/lib/site";
+import { SITE_DETAILS, legalIsDraft, unresolvedDetails } from "@/lib/site";
+
+/**
+ * A fact nobody has supplied yet.
+ *
+ * Rendered as a marked gap, not as prose. The whole point is that it cannot be
+ * mistaken for a decision: an invented contact address or an invented governing
+ * jurisdiction reads exactly like a real one, so the reader — and the person who
+ * would have to honour it — has no way to tell it was a guess.
+ *
+ * `label` says what is missing in the words the person filling it in would use,
+ * so the page doubles as the checklist.
+ */
+export function Placeholder({ label }: { label: string }) {
+  return (
+    <mark
+      // Not a styled <span>: this genuinely is marked-up text awaiting review,
+      // and <mark> is what a screen reader announces as highlighted.
+      className="mx-0.5 rounded-sm bg-[var(--tone-warn-bg)] px-1.5 py-0.5 font-mono text-[0.8em] font-semibold whitespace-nowrap text-[var(--tone-warn-fg)]"
+      title="This detail has not been supplied yet"
+    >
+      [ {label} ]
+    </mark>
+  );
+}
+
+/**
+ * Shown at the top of every legal document while anything is unresolved.
+ *
+ * Deliberately loud and deliberately unremovable-by-accident: it disappears on
+ * its own the moment the last detail in SITE_DETAILS is filled in, and not
+ * before. The same condition also keeps these pages out of the sitemap and out
+ * of search indexes, so a draft cannot be crawled.
+ */
+function DraftNotice() {
+  const missing = unresolvedDetails();
+
+  return (
+    <aside className="mb-8 rounded-[var(--radius-card)] border border-[var(--caution)]/40 bg-[var(--tone-warn-bg)] p-5">
+      <p className="text-sm font-semibold text-[var(--tone-warn-fg)]">
+        Draft — not yet reviewed, and not fit to rely on
+      </p>
+      <p className="mt-2 text-sm leading-relaxed text-[var(--tone-warn-fg)]">
+        This document has not been checked by anyone qualified to approve it, and
+        the highlighted gaps below have not been decided. Nothing here should be
+        treated as a commitment, shown to a client, or published until both are
+        resolved.
+      </p>
+      <p className="mt-3 text-xs text-[var(--tone-warn-fg)]">
+        {missing.length} detail{missing.length === 1 ? "" : "s"} outstanding, set
+        in <code className="font-mono">src/lib/site.ts</code>:{" "}
+        <span className="font-mono">{missing.join(", ")}</span>. While any remain,
+        these pages are excluded from the sitemap and marked noindex.
+      </p>
+    </aside>
+  );
+}
 
 /**
  * The shared typography for a legal document.
@@ -18,6 +74,8 @@ export function LegalPage({
 }) {
   return (
     <article>
+      {legalIsDraft() && <DraftNotice />}
+
       <h1 className="text-3xl leading-9 font-semibold tracking-tight text-heading">
         {title}
       </h1>
@@ -25,7 +83,13 @@ export function LegalPage({
         {summary}
       </p>
       <p className="mt-4 text-xs text-muted-foreground">
-        Last reviewed {POLICY_UPDATED}
+        {SITE_DETAILS.reviewedOn ? (
+          <>Last reviewed {SITE_DETAILS.reviewedOn}</>
+        ) : (
+          <>
+            Last reviewed <Placeholder label="review date" />
+          </>
+        )}
       </p>
 
       <div
@@ -45,5 +109,21 @@ export function LegalPage({
         {children}
       </div>
     </article>
+  );
+}
+
+/**
+ * The contact address, or a marked gap where it should be.
+ *
+ * Used often enough across the three documents to be worth one component — and
+ * worth one component precisely because a contact address that differs between
+ * two policy pages is a classic way to end up with an unmonitored mailbox.
+ */
+export function ContactEmail() {
+  if (!SITE_DETAILS.contactEmail) {
+    return <Placeholder label="contact e-mail" />;
+  }
+  return (
+    <a href={`mailto:${SITE_DETAILS.contactEmail}`}>{SITE_DETAILS.contactEmail}</a>
   );
 }

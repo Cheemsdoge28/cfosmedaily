@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { LegalPage } from "@/app/legal/legal-page";
-import { CONTACT_EMAIL, OPERATOR, SITE_NAME } from "@/lib/site";
+import { ContactEmail, LegalPage, Placeholder } from "@/app/legal/legal-page";
+import { OPERATOR, SITE_DETAILS, SITE_NAME, legalIsDraft } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Terms of use",
   description: `The terms on which ${OPERATOR} provides access to ${SITE_NAME}.`,
-  robots: { index: true, follow: true },
+  // Never index a document that still has gaps in it.
+  robots: legalIsDraft()
+    ? { index: false, follow: false }
+    : { index: true, follow: true },
 };
 
 /**
@@ -76,8 +79,7 @@ export default function TermsPage() {
       </ul>
       <p>
         If you find you can see something you should not, tell us at{" "}
-        <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> rather than
-        exploring further.
+        <ContactEmail /> rather than exploring further.
       </p>
 
       <h2>4. Accuracy of what you see</h2>
@@ -120,23 +122,27 @@ export default function TermsPage() {
 
       <h2>8. Liability</h2>
       <p>
-        Nothing in these terms limits any liability that cannot lawfully be
-        limited. Subject to that, {OPERATOR} is not liable for indirect or
-        consequential loss arising from use of the portal, or for loss arising
-        from reliance on the portal in place of the statutory deadlines and advice
-        provided under your engagement.
+        <Placeholder label="liability clause — to be drafted and approved by a lawyer" />
+      </p>
+      <p>
+        This section is deliberately empty rather than filled with a plausible
+        limitation. A liability clause decides who carries a loss, and one nobody
+        has approved is worse than none at all.
       </p>
 
       <h2>9. Governing law</h2>
       <p>
-        These terms are governed by the laws of India, and the courts of India
-        have exclusive jurisdiction over any dispute arising from them.
+        These terms are governed by the laws of India. Disputes are subject to the
+        exclusive jurisdiction of{" "}
+        {SITE_DETAILS.jurisdiction ?? (
+          <Placeholder label="seat of jurisdiction — the specific courts, e.g. the courts of Mumbai" />
+        )}
+        .
       </p>
 
       <h2>10. Contact</h2>
       <p>
-        Questions about these terms go to{" "}
-        <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
+        Questions about these terms go to <ContactEmail />.
       </p>
     </LegalPage>
   );

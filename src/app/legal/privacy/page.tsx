@@ -1,22 +1,27 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { LegalPage } from "@/app/legal/legal-page";
-import { CONTACT_EMAIL, OPERATOR, SITE_NAME } from "@/lib/site";
+import { ContactEmail, LegalPage, Placeholder } from "@/app/legal/legal-page";
+import { OPERATOR, SITE_DETAILS, SITE_NAME, legalIsDraft } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Privacy",
   description: `What personal information ${SITE_NAME} holds, why, and for how long.`,
-  robots: { index: true, follow: true },
+  // Never index a document that still has gaps in it.
+  robots: legalIsDraft()
+    ? { index: false, follow: false }
+    : { index: true, follow: true },
 };
 
 /**
  * The privacy notice.
  *
- * Written against what the product actually stores — the columns are real and so
- * are the retention rules — so that it can be checked rather than believed. The
- * lawful-basis and rights sections follow India's DPDP Act 2023, which is the
- * regime this deployment sits under.
+ * The sections describing *what the product does* are written against the real
+ * columns and the real retention behaviour, so they can be checked against the
+ * source. The sections that state a commitment — who to write to, how long a
+ * record is kept after an engagement ends, how quickly a request is answered —
+ * are left as marked gaps, because those are the operator's decisions and an
+ * invented answer reads exactly like a real one.
  */
 export default function PrivacyPage() {
   return (
@@ -28,8 +33,29 @@ export default function PrivacyPage() {
       <p>
         {OPERATOR} operates this portal and decides what is held in it. For the
         purposes of the Digital Personal Data Protection Act, 2023, {OPERATOR} is
-        the Data Fiduciary. Questions go to{" "}
-        <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
+        the Data Fiduciary.
+      </p>
+      <p>
+        Registered address:{" "}
+        {SITE_DETAILS.postalAddress ?? <Placeholder label="registered address" />}
+        . General questions: <ContactEmail />.
+      </p>
+
+      <h3>Grievance Officer</h3>
+      <p>
+        The DPDP Act requires us to name someone to receive grievances directly.
+        That is{" "}
+        {SITE_DETAILS.grievanceOfficer ? (
+          <>
+            {SITE_DETAILS.grievanceOfficer.name},{" "}
+            <a href={`mailto:${SITE_DETAILS.grievanceOfficer.email}`}>
+              {SITE_DETAILS.grievanceOfficer.email}
+            </a>
+          </>
+        ) : (
+          <Placeholder label="grievance officer — name and e-mail" />
+        )}
+        .
       </p>
 
       <h2>What we hold about you</h2>
@@ -113,12 +139,19 @@ export default function PrivacyPage() {
         Nobody, other than the infrastructure providers that run the service on
         our behalf:
       </p>
-      <ul>
-        <li>a managed application host, which serves the site;</li>
-        <li>a managed PostgreSQL provider, which stores the data.</li>
-      </ul>
+      {SITE_DETAILS.processors ? (
+        <ul>
+          {SITE_DETAILS.processors.map((processor) => (
+            <li key={processor}>{processor}</li>
+          ))}
+        </ul>
+      ) : (
+        <p>
+          <Placeholder label="processors — each host and database provider, named, with the country it operates in" />
+        </p>
+      )}
       <p>
-        Both act on our instructions only. We do not sell personal information,
+        They act on our instructions only. We do not sell personal information,
         and we do not share it with advertisers. We will disclose information
         where the law requires it.
       </p>
@@ -131,11 +164,13 @@ export default function PrivacyPage() {
           it did is kept, as below.
         </li>
         <li>
-          <b>The audit trail and task history</b> — retained for the life of the
-          engagement and any period professional record-keeping requires
-          afterwards. This is why removing an account does not erase the entries
-          it wrote: a record of work that can be made to forget who did the work
-          is not a record.
+          <b>The audit trail and task history</b> — kept for{" "}
+          {SITE_DETAILS.retentionPeriod ?? (
+            <Placeholder label="retention period after an engagement ends" />
+          )}
+          . This is why removing an account does not erase the entries it wrote: a
+          record of work that can be made to forget who did the work is not a
+          record.
         </li>
         <li>
           <b>Sessions</b> — expire within 12 hours and are deleted on the normal
@@ -159,9 +194,12 @@ export default function PrivacyPage() {
         </li>
       </ul>
       <p>
-        Write to <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>. We will
-        respond within 30 days. Where we cannot erase something, we will tell you
-        which obligation requires us to keep it.
+        Write to <ContactEmail />. We will respond within{" "}
+        {SITE_DETAILS.rightsResponseWindow ?? (
+          <Placeholder label="response window for a rights request" />
+        )}
+        . Where we cannot erase something, we will tell you which obligation
+        requires us to keep it.
       </p>
 
       <h2>How it is protected</h2>

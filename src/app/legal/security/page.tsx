@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
 
-import { LegalPage } from "@/app/legal/legal-page";
-import { CONTACT_EMAIL, OPERATOR, SITE_NAME } from "@/lib/site";
+import { ContactEmail, LegalPage, Placeholder } from "@/app/legal/legal-page";
+import { OPERATOR, SITE_DETAILS, SITE_NAME, legalIsDraft } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Security",
   description: `How ${SITE_NAME} protects client information: access control, credentials, sessions and audit.`,
   // Overrides the portal-wide noindex: this is one of the pages that exists to
   // be read by someone with no account.
-  robots: { index: true, follow: true },
+  // Never index a document that still has gaps in it.
+  robots: legalIsDraft()
+    ? { index: false, follow: false }
+    : { index: true, follow: true },
 };
 
 /**
@@ -23,7 +26,7 @@ export default function SecurityPage() {
   return (
     <LegalPage
       title="Security"
-      summary={`How ${SITE_NAME} protects the information it holds. Everything described here is implemented in the product, not planned.`}
+      summary={`How ${SITE_NAME} protects the information it holds. Except where marked, everything described here is implemented in the product and can be checked against the source — none of it is aspirational.`}
     >
       <h2>What the portal holds</h2>
       <p>
@@ -152,8 +155,13 @@ export default function SecurityPage() {
           protection and a restrictive permissions policy.
         </li>
         <li>
-          Data is held in a managed PostgreSQL database with encryption at rest
-          and in transit, and with the provider&rsquo;s own backups.
+          Data is held in a managed PostgreSQL database.{" "}
+          {SITE_DETAILS.hostingStatement ?? (
+            <Placeholder label="hosting — provider, region, encryption at rest, and the backup and restore arrangement" />
+          )}{" "}
+          Unlike the rest of this page, that is a property of the hosting
+          arrangement rather than of the software, so it is stated by the
+          operator rather than asserted here.
         </li>
         <li>
           Register downloads are never cached, so one client&rsquo;s workbook
@@ -175,10 +183,9 @@ export default function SecurityPage() {
 
       <h2>Reporting a problem</h2>
       <p>
-        If you believe you have found a security issue, write to{" "}
-        <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> with enough
-        detail to reproduce it. Please do not post it publicly before we have had
-        a chance to respond.
+        If you believe you have found a security issue, write to <ContactEmail />{" "}
+        with enough detail to reproduce it. Please do not post it publicly before
+        we have had a chance to respond.
       </p>
     </LegalPage>
   );

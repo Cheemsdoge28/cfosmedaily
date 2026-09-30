@@ -190,6 +190,26 @@ than it did in September.
 
 ---
 
+## Legal pages
+
+`/legal/privacy`, `/legal/terms` and `/legal/security` are **a draft**. The
+details they would assert — contact address, Grievance Officer, jurisdiction,
+processors, retention period — are `null` in [`src/lib/site.ts`](src/lib/site.ts)
+and render as marked gaps rather than as plausible prose, because an invented
+fact in a privacy notice reads exactly like a real one.
+
+While any detail is unsupplied the pages carry a draft banner, are served
+`noindex`, and are left out of `sitemap.xml`. All three are driven from one
+predicate, so they cannot fall out of step. `npm run check:legal` lists what is
+outstanding and exits non-zero — wire it into the deploy step, not the dev loop.
+
+Filling those in is necessary but **not sufficient**: the privacy notice and the
+terms make commitments on the operator's behalf and need review by someone
+qualified to approve them. The security page is different — every claim on it
+describes behaviour that is implemented and checkable in the source.
+
+---
+
 ## Scripts
 
 | | |
@@ -205,3 +225,4 @@ than it did in September.
 | `npm run check` | The register's rules — dates, status/progress coupling. No database. |
 | `npm run check:workbook -- <file>` | Parse a workbook and prove the export/import round trip |
 | `npm run check:access` | The access boundary, against the real database |
+| `npm run check:legal` | Whether the legal documents are publishable |
