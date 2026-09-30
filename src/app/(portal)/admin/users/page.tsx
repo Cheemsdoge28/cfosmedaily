@@ -55,6 +55,7 @@ export default async function UsersPage() {
     isLocked: Boolean(user.lockedUntil && user.lockedUntil > now),
     mustChangePassword: user.mustChangePassword,
     lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
+    removedAt: user.deletedAt?.toISOString() ?? null,
     isSelf: user.id === admin.id,
     grants: user.access.map((grant) => ({
       clientId: grant.clientId,
@@ -63,7 +64,12 @@ export default async function UsersPage() {
     })),
   }));
 
-  const members = directory.filter((user) => user.role !== "PLATFORM_ADMIN");
+  // Removed accounts are still fetched — an administrator has to be able to find
+  // and restore one — but they are counted separately so the headline figures
+  // describe the people who can actually sign in.
+  const live = directory.filter((user) => !user.removedAt);
+  const removed = directory.length - live.length;
+  const members = live.filter((user) => user.role !== "PLATFORM_ADMIN");
   const withoutAccess = members.filter((user) => user.grants.length === 0).length;
 
   return (
@@ -72,11 +78,12 @@ export default async function UsersPage() {
         title="Users"
         description="Everyone who can sign in. Access is granted per client — open an account to manage what it can see."
         meta={[
-          `${directory.length} account${directory.length === 1 ? "" : "s"}`,
-          `${directory.length - members.length} CFOSME staff`,
+          `${live.length} account${live.length === 1 ? "" : "s"}`,
+          `${live.length - members.length} CFOSME staff`,
           withoutAccess > 0
             ? `${withoutAccess} with no access granted`
             : "all members have access",
+          ...(removed > 0 ? [`${removed} removed`] : []),
         ].join(" · ")}
       />
 

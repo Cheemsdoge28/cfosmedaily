@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 
 import { THEME_INIT_SCRIPT, ThemeProvider } from "@/components/theme/theme";
+import { SITE_DESCRIPTION, SITE_NAME, canonicalOrigin } from "@/lib/site";
 
 import "./globals.css";
 import { Geist } from "next/font/google";
@@ -10,13 +11,31 @@ import { cn } from "@/lib/utils";
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
+  // Without this, the generated Open Graph image resolves to a relative URL and
+  // no link preview can fetch it.
+  metadataBase: new URL(canonicalOrigin()),
   title: {
-    default: "CFOSME Pulse Pro",
-    template: "%s · CFOSME Pulse Pro",
+    default: SITE_NAME,
+    template: `%s · ${SITE_NAME}`,
   },
-  description:
-    "CFOSME's task register — client delivery, workload, deadlines and completion at a management level.",
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  // Private by default. The three pages meant to be read without an account —
+  // the sign-in page and the legal documents — opt back in individually, which
+  // is the safe direction for the default to point.
   robots: { index: false, follow: false },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    url: canonicalOrigin(),
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+  },
 };
 
 export const viewport: Viewport = {

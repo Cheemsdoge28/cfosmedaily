@@ -74,6 +74,8 @@ const AUDIT_ACTIONS: Record<string, string> = {
   "user.create": "Login created",
   "user.update": "Login updated",
   "user.deactivate": "Login deactivated",
+  "user.remove": "Account removed",
+  "user.restore": "Account restored",
   "user.password.reset": "Password reset",
   "access.grant": "Client access granted",
   "access.update": "Client access changed",

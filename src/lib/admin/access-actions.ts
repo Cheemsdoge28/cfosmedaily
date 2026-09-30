@@ -387,3 +387,139 @@ export async function setRoleAction(
         : `${user.name} is now a member with no client access yet — grant the clients they need below. They were signed out.`,
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Removal — a mark, never a delete
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Removes an account from view.
+ *
+ * Deliberately not a delete. Everything the account is referenced from stays
+ * exactly where it is: the audit entries it wrote, the tasks it moved, the
+ * workbook imports it ran, and the client grants it held. Hard-deleting the row
+ * would take "who moved this task to Done in September" with it, and that is the
+ * one question the register exists to answer.
+ *
+ * What removal actually does is make the account unreachable — it cannot sign
+ * in, its live sessions end immediately, and it drops out of every listing
+ * except the administration screen that can restore it.
+ *
+ * The grants are kept rather than cleared, for two reasons: they are part of the
+ * record of what this person could see and when, and keeping them makes a
+ * restore put the account back exactly as it was instead of silently blank. They
+ * are inert while the mark is set, because the session lookup refuses the
+ * account before any grant is ever read.
+ */
+export async function removeUserAction(
+  _prev: AdminState,
+  formData: FormData,
+): Promise<AdminState> {
+  const admin = await requirePlatformAdmin();
+
+  const userId = String(formData.get("userId") ?? "");
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      deletedAt: true,
+      _count: { select: { access: true } },
+    },
+  });
+  if (!user) return fail("That account no longer exists.");
+  if (user.deletedAt) return fail("That account has already been removed.");
+
+  if (user.id === admin.id) {
+    return fail("You cannot remove your own account.");
+  }
+
+  if (user.role === "PLATFORM_ADMIN") {
+    const staffLeft = await prisma.user.count({
+      where: {
+        role: "PLATFORM_ADMIN",
+        isActive: true,
+        deletedAt: null,
+        id: { not: user.id },
+      },
+    });
+    if (staffLeft === 0) {
+      return fail(
+        "That is the only remaining CFOSME staff account. Promote someone else before removing it.",
+      );
+    }
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { deletedAt: new Date(), deletedById: admin.id },
+  });
+
+  // The mark alone would already end their access on the next request; ending
+  // the sessions now means it takes effect on the current one too.
+  await revokeAllSessions(user.id);
+
+  await recordAudit({
+    action: "user.remove",
+    userId: admin.id,
+    detail: `${user.email} removed — history kept, ${user._count.access} client grant(s) retained`,
+  });
+
+  revalidatePath("/admin/users");
+  revalidatePath(`/admin/users/${user.id}`);
+  revalidatePath("/admin");
+
+  return {
+    ...INITIAL_ADMIN_STATE,
+    success: `${user.name} has been removed and signed out. Their history is kept, and the account can be restored.`,
+  };
+}
+
+/** Brings a removed account back, with the access it had. */
+export async function restoreUserAction(
+  _prev: AdminState,
+  formData: FormData,
+): Promise<AdminState> {
+  const admin = await requirePlatformAdmin();
+
+  const userId = String(formData.get("userId") ?? "");
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      isActive: true,
+      deletedAt: true,
+      _count: { select: { access: true } },
+    },
+  });
+  if (!user) return fail("That account no longer exists.");
+  if (!user.deletedAt) return fail("That account has not been removed.");
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { deletedAt: null, deletedById: null },
+  });
+
+  await recordAudit({
+    action: "user.restore",
+    userId: admin.id,
+    detail: `${user.email} restored with ${user._count.access} client grant(s)`,
+  });
+
+  revalidatePath("/admin/users");
+  revalidatePath(`/admin/users/${user.id}`);
+  revalidatePath("/admin");
+
+  const caveat = user.isActive
+    ? ""
+    : " The account is still deactivated, so reactivate it before they can sign in.";
+
+  return {
+    ...INITIAL_ADMIN_STATE,
+    success: `${user.name} is back, with the ${user._count.access} client grant(s) they had.${caveat}`,
+  };
+}

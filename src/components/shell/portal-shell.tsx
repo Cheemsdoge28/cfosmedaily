@@ -126,8 +126,18 @@ export function PortalShell({
             {children}
           </main>
 
-          <footer className="no-print px-4 pb-6 text-center text-xs text-muted-foreground sm:px-6">
-            CFOSME Pulse Pro &middot; Confidential client information
+          <footer className="no-print flex flex-wrap items-center justify-center gap-x-3 gap-y-1 px-4 pb-6 text-center text-xs text-muted-foreground sm:px-6">
+            <span>CFOSME Pulse Pro &middot; Confidential client information</span>
+            <span aria-hidden="true">&middot;</span>
+            <Link href="/legal/privacy" className="underline-offset-2 hover:text-foreground hover:underline">
+              Privacy
+            </Link>
+            <Link href="/legal/terms" className="underline-offset-2 hover:text-foreground hover:underline">
+              Terms
+            </Link>
+            <Link href="/legal/security" className="underline-offset-2 hover:text-foreground hover:underline">
+              Security
+            </Link>
           </footer>
         </div>
       </SidebarInset>

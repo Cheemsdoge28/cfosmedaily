@@ -104,8 +104,18 @@ export async function createClientAction(
   if (wantsLogin && !adminName) {
     return fail("Enter a name for the first login, or leave the e-mail blank.");
   }
-  if (wantsLogin && (await prisma.user.findUnique({ where: { email: adminEmail! } }))) {
-    return fail("That e-mail already has an account.");
+  if (wantsLogin) {
+    const taken = await prisma.user.findUnique({
+      where: { email: adminEmail! },
+      select: { deletedAt: true },
+    });
+    if (taken) {
+      return fail(
+        taken.deletedAt
+          ? "That e-mail belongs to a removed account. Restore it from Users instead of creating a second one."
+          : "That e-mail already has an account.",
+      );
+    }
   }
 
   const temporaryPassword = wantsLogin ? generateTemporaryPassword() : undefined;
@@ -233,8 +243,19 @@ export async function createUserAction(
 
   if (!parsed.success) return fail(parsed.error.issues[0]!.message);
 
-  if (await prisma.user.findUnique({ where: { email: parsed.data.email } })) {
-    return fail("That e-mail already has an account.");
+  // A removed account still holds its e-mail, because releasing it would mean
+  // rewriting the row the history points at. So a collision with one is reported
+  // as what it is, with the fix — restore it — rather than a flat refusal.
+  const existingAccount = await prisma.user.findUnique({
+    where: { email: parsed.data.email },
+    select: { deletedAt: true },
+  });
+  if (existingAccount) {
+    return fail(
+      existingAccount.deletedAt
+        ? "That e-mail belongs to a removed account. Restore it from the Removed section instead of creating a second one."
+        : "That e-mail already has an account.",
+    );
   }
 
   // "none" is the sentinel the form uses for "grant the clients later", because a

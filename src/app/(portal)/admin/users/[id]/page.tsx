@@ -8,6 +8,7 @@ import {
 } from "@/app/(portal)/admin/users/[id]/access-editor";
 import {
   AccountForms,
+  RemovalForms,
   RoleForm,
   SessionForms,
 } from "@/app/(portal)/admin/users/[id]/access-forms";
@@ -65,6 +66,7 @@ export default async function UserAccessPage({
         where: { revokedAt: null, expiresAt: { gt: new Date() } },
         orderBy: { lastSeenAt: "desc" },
       },
+      deletedBy: { select: { name: true } },
     },
   });
 
@@ -105,6 +107,7 @@ export default async function UserAccessPage({
 
   const editable = user.access.filter((grant) => grant.level === "EDIT").length;
   const isLocked = Boolean(user.lockedUntil && user.lockedUntil > new Date());
+  const isRemoved = Boolean(user.deletedAt);
 
   return (
     <div className="mx-auto w-full max-w-[96rem]">
@@ -124,21 +127,29 @@ export default async function UserAccessPage({
       />
 
       <Stack>
-        {!user.isActive && (
+        {isRemoved && (
+          <Callout tone="neutral" title="This account has been removed">
+            It is hidden from the portal and cannot sign in. Nothing was deleted —
+            its audit trail, the tasks it moved and the client access it held are
+            all still here. Restore it at the foot of this page.
+          </Callout>
+        )}
+
+        {!user.isActive && !isRemoved && (
           <Callout tone="bad" title="This account is deactivated">
             They cannot sign in, and their access below is dormant until the
             account is reactivated.
           </Callout>
         )}
 
-        {isLocked && user.isActive && (
+        {isLocked && user.isActive && !isRemoved && (
           <Callout tone="warn" title="Locked after repeated failed sign-ins">
             Locked until {formatDateTime(user.lockedUntil)}. Resetting the
             password clears it immediately.
           </Callout>
         )}
 
-        {!isPlatformAdmin && user.access.length === 0 && user.isActive && (
+        {!isPlatformAdmin && user.access.length === 0 && user.isActive && !isRemoved && (
           <Callout tone="warn" title="No clients granted">
             This account can sign in but has nothing to look at. Grant it a client
             below.
@@ -172,7 +183,9 @@ export default async function UserAccessPage({
             <Detail
               label="Status"
               value={
-                !user.isActive ? (
+                isRemoved ? (
+                  <Badge tone="neutral">Removed</Badge>
+                ) : !user.isActive ? (
                   <Badge tone="bad">Deactivated</Badge>
                 ) : isLocked ? (
                   <Badge tone="warn">Locked</Badge>
@@ -268,6 +281,22 @@ export default async function UserAccessPage({
               </Table>
             </TableWrap>
           )}
+        </Card>
+
+        {/* ── Removing the account ────────────────────────────────────────── */}
+        <Card
+          title={isRemoved ? "Restore this account" : "Remove this account"}
+          description="Removal hides the account and keeps every record it is part of"
+        >
+          <RemovalForms
+            userId={user.id}
+            userName={user.name}
+            isRemoved={isRemoved}
+            removedAt={user.deletedAt ? formatDateTime(user.deletedAt) : null}
+            removedByName={user.deletedBy?.name ?? null}
+            grantCount={user.access.length}
+            isSelf={isSelf}
+          />
         </Card>
 
         {/* ── What they have done ─────────────────────────────────────────── */}

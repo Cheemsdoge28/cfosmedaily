@@ -6,7 +6,12 @@ import { useFormStatus } from "react-dom";
 import { Feedback, Submit } from "@/components/admin/form-bits";
 import { Button } from "@/components/ui/button";
 import { CONTROL, cn } from "@/components/ui/primitives";
-import { revokeSessionsAction, setRoleAction } from "@/lib/admin/access-actions";
+import {
+  removeUserAction,
+  restoreUserAction,
+  revokeSessionsAction,
+  setRoleAction,
+} from "@/lib/admin/access-actions";
 import {
   resetPasswordAction,
   toggleUserActiveAction,
@@ -162,5 +167,93 @@ function SessionSubmit() {
     >
       {pending ? "Signing out…" : "Sign out"}
     </Button>
+  );
+}
+
+/**
+ * Removing an account, and bringing it back.
+ *
+ * Removal is a mark, not a delete, and the copy says so plainly — an
+ * administrator reaching for this needs to know before they press it that the
+ * audit trail and the task history survive, because the alternative reading
+ * ("this erases them") is the one that stops people using it and leaves dead
+ * accounts lying around instead.
+ *
+ * It is deliberately the last control on the page and deliberately not styled as
+ * a destructive red button, because it is not destructive. Deactivation above it
+ * is the reversible day-to-day tool; this is the one for somebody who has left.
+ */
+export function RemovalForms({
+  userId,
+  userName,
+  isRemoved,
+  removedAt,
+  removedByName,
+  grantCount,
+  isSelf,
+}: {
+  userId: string;
+  userName: string;
+  isRemoved: boolean;
+  removedAt: string | null;
+  removedByName: string | null;
+  grantCount: number;
+  isSelf: boolean;
+}) {
+  const [removeState, removeAction] = useActionState(
+    removeUserAction,
+    INITIAL_ADMIN_STATE,
+  );
+  const [restoreState, restoreAction] = useActionState(
+    restoreUserAction,
+    INITIAL_ADMIN_STATE,
+  );
+
+  if (isSelf) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        This is your own account, so it cannot be removed here.
+      </p>
+    );
+  }
+
+  if (isRemoved) {
+    return (
+      <div className="space-y-3">
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Removed{removedAt ? ` ${removedAt}` : ""}
+          {removedByName ? ` by ${removedByName}` : ""}. Nothing was deleted —
+          the audit trail, the tasks this account moved, the workbook imports it
+          ran and its {grantCount} client grant
+          {grantCount === 1 ? "" : "s"} are all still here. Restoring puts it back
+          exactly as it was.
+        </p>
+        <form action={restoreAction}>
+          <input type="hidden" name="userId" value={userId} />
+          <Submit label="Restore account" pendingLabel="Restoring…" variant="outline" />
+        </form>
+        <Feedback state={restoreState} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Hides {userName} from the portal and signs them out. <b>Nothing is
+        deleted</b>: the audit trail, the tasks they moved and the client access
+        they held are kept, so the register stays answerable. The account can be
+        restored at any time.
+      </p>
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        For somebody who is only away, use <b>Deactivate</b> above — it blocks
+        sign-in but leaves them listed.
+      </p>
+      <form action={removeAction}>
+        <input type="hidden" name="userId" value={userId} />
+        <Submit label="Remove account" pendingLabel="Removing…" variant="ghost" />
+      </form>
+      <Feedback state={removeState} />
+    </div>
   );
 }

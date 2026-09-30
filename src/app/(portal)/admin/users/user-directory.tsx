@@ -42,17 +42,22 @@ export type DirectoryUser = {
   isLocked: boolean;
   mustChangePassword: boolean;
   lastLoginAt: string | null;
+  /** Set when the account has been removed. Removal is a mark, never a delete. */
+  removedAt: string | null;
   isSelf: boolean;
   grants: { clientId: string; clientName: string; level: string }[];
 };
 
-type Filter = "all" | "staff" | "members" | "attention";
+type Filter = "all" | "staff" | "members" | "attention" | "removed";
 
 /**
  * An account that can sign in but has nothing to look at, or cannot sign in at
  * all. Worth surfacing: it is always a setup somebody did not finish.
  */
 function needsAttention(user: DirectoryUser): boolean {
+  // A removed account is settled, not outstanding — flagging it would put a
+  // permanent number on the filter that nobody can ever clear.
+  if (user.removedAt) return false;
   if (!user.isActive || user.isLocked) return true;
   if (user.role === "PLATFORM_ADMIN") return false;
   return user.grants.length === 0;
@@ -62,20 +67,30 @@ export function UserDirectory({ users }: { users: DirectoryUser[] }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
 
-  const counts = useMemo(
-    () => ({
-      all: users.length,
-      staff: users.filter((u) => u.role === "PLATFORM_ADMIN").length,
-      members: users.filter((u) => u.role !== "PLATFORM_ADMIN").length,
-      attention: users.filter(needsAttention).length,
-    }),
-    [users],
-  );
+  const counts = useMemo(() => {
+    // Every count except "removed" describes accounts that can actually sign in.
+    const live = users.filter((u) => !u.removedAt);
+    return {
+      all: live.length,
+      staff: live.filter((u) => u.role === "PLATFORM_ADMIN").length,
+      members: live.filter((u) => u.role !== "PLATFORM_ADMIN").length,
+      attention: live.filter(needsAttention).length,
+      removed: users.length - live.length,
+    };
+  }, [users]);
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
 
     return users.filter((user) => {
+      // Removed accounts are hidden unless asked for by name or by the filter —
+      // they are kept for the history they anchor, not to be browsed.
+      const removed = Boolean(user.removedAt);
+      if (filter === "removed") {
+        if (!removed) return false;
+      } else if (removed && !needle) {
+        return false;
+      }
       if (filter === "staff" && user.role !== "PLATFORM_ADMIN") return false;
       if (filter === "members" && user.role === "PLATFORM_ADMIN") return false;
       if (filter === "attention" && !needsAttention(user)) return false;
@@ -93,36 +108,58 @@ export function UserDirectory({ users }: { users: DirectoryUser[] }) {
     });
   }, [users, query, filter]);
 
-  const staff = visible.filter((user) => user.role === "PLATFORM_ADMIN");
-  const members = visible.filter((user) => user.role !== "PLATFORM_ADMIN");
+  const staff = visible.filter(
+    (user) => !user.removedAt && user.role === "PLATFORM_ADMIN",
+  );
+  const members = visible.filter(
+    (user) => !user.removedAt && user.role !== "PLATFORM_ADMIN",
+  );
+  const removedUsers = visible.filter((user) => user.removedAt);
 
   return (
     <div className="space-y-4">
       <Card>
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
-          <div className="relative min-w-0 flex-1">
-            <Input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search a name, an e-mail, or a client…"
-              aria-label="Search users"
-              className="w-full"
+        {/*
+          The search and the filters stack on a phone and sit on one row from
+          `lg`. They used to go side by side from `md`, where five segments and a
+          search field do not fit: the segments were squeezed until "Needs
+          attention" wrapped inside its own pill, and on a 390px screen the track
+          overflowed the card entirely.
+
+          On a phone the segmented track scrolls sideways instead of shrinking.
+          A control that holds five named options cannot be made narrow enough
+          for a phone without either truncating the names — which is what the
+          filter is for — or wrapping to three rows of chips. Scrolling keeps
+          every label whole and keeps the row one control tall; `-mx-1 px-1`
+          lets the pill's shadow reach the edge instead of being clipped.
+        */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <Input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search a name, an e-mail, or a client…"
+            aria-label="Search users"
+            className="w-full min-w-0 lg:flex-1"
+          />
+
+          <div className="-mx-1 overflow-x-auto px-1 pb-1 lg:mx-0 lg:overflow-visible lg:px-0 lg:pb-0">
+            <Segmented
+              ariaLabel="Filter users"
+              value={filter}
+              onValueChange={setFilter}
+              className="w-max lg:w-auto lg:shrink-0"
+              options={[
+                { value: "all", label: "Everyone", hint: counts.all },
+                { value: "staff", label: "Staff", hint: counts.staff },
+                { value: "members", label: "Members", hint: counts.members },
+                { value: "attention", label: "Attention", hint: counts.attention },
+                ...(counts.removed > 0
+                  ? ([{ value: "removed", label: "Removed", hint: counts.removed }] as const)
+                  : []),
+              ]}
             />
           </div>
-
-          <Segmented
-            ariaLabel="Filter users"
-            value={filter}
-            onValueChange={setFilter}
-            className="shrink-0"
-            options={[
-              { value: "all", label: "Everyone", hint: counts.all },
-              { value: "staff", label: "Staff", hint: counts.staff },
-              { value: "members", label: "Members", hint: counts.members },
-              { value: "attention", label: "Needs attention", hint: counts.attention },
-            ]}
-          />
         </div>
       </Card>
 
@@ -146,6 +183,13 @@ export function UserDirectory({ users }: { users: DirectoryUser[] }) {
               title="Members"
               description="See exactly the clients granted to them, at the level each grant gives."
               users={members}
+            />
+          )}
+          {removedUsers.length > 0 && (
+            <Section
+              title="Removed"
+              description="Hidden from the portal and unable to sign in. Their history, and the access they held, is kept — open one to restore it."
+              users={removedUsers}
             />
           )}
         </>
@@ -197,7 +241,7 @@ function UserRow({ user }: { user: DirectoryUser }) {
         "hover:bg-muted focus-visible:bg-muted",
       )}
     >
-      <Avatar name={user.name} muted={!user.isActive} />
+      <Avatar name={user.name} muted={!user.isActive || Boolean(user.removedAt)} />
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -213,7 +257,14 @@ function UserRow({ user }: { user: DirectoryUser }) {
         </p>
 
         <div className="mt-2">
-          {user.role === "PLATFORM_ADMIN" ? (
+          {user.removedAt ? (
+            <span className="text-xs text-muted-foreground">
+              Removed {formatDateTime(user.removedAt)} · history kept
+              {user.grants.length > 0
+                ? `, ${user.grants.length} grant${user.grants.length === 1 ? "" : "s"} retained`
+                : ""}
+            </span>
+          ) : user.role === "PLATFORM_ADMIN" ? (
             <span className="text-xs font-medium text-foreground">
               Every client
               <span className="font-normal text-muted-foreground">
@@ -290,6 +341,7 @@ function ClientChips({
 }
 
 function StatusBadge({ user }: { user: DirectoryUser }) {
+  if (user.removedAt) return <Badge tone="neutral">Removed</Badge>;
   if (!user.isActive) return <Badge tone="bad">Deactivated</Badge>;
   if (user.isLocked) return <Badge tone="warn">Locked</Badge>;
   if (user.mustChangePassword) {

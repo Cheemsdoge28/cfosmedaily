@@ -57,6 +57,9 @@ function check(label: string, condition: boolean, detail = "") {
 
 async function main() {
   const users = await prisma.user.findMany({
+    // Removed accounts cannot sign in, so their grants are inert and checking
+    // them would report an access boundary nobody can reach.
+    where: { deletedAt: null },
     include: {
       access: {
         where: { client: { isActive: true } },

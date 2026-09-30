@@ -20,6 +20,8 @@ export type AuditAction =
   | "user.update"
   | "user.password.reset"
   | "user.deactivate"
+  | "user.remove"
+  | "user.restore"
   | "access.grant"
   | "access.update"
   | "access.revoke"

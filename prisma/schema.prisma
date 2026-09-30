@@ -98,6 +98,18 @@ model User {
   /// Forces a password change on next sign-in (used after an admin reset).
   mustChangePassword Boolean @default(false)
 
+  /// When the account was removed, and by whom. Removal is a mark, never a
+  /// delete: the row stays, and so does everything that points at it — the
+  /// audit trail, the task history, the imports it ran, the grants it held.
+  ///
+  /// Hard-deleting a user would take the answer to "who moved this task to
+  /// Done in September" with it, and that is the one question the register
+  /// exists to answer. So a removed account is simply invisible: it cannot
+  /// sign in, it holds no live sessions, and it is filtered out of every
+  /// listing except the administration screen that can bring it back.
+  deletedAt   DateTime?
+  deletedById String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -109,7 +121,12 @@ model User {
   access       ClientAccess[]
   grantsMade   ClientAccess[] @relation("ClientAccessGrantedBy")
 
+  deletedBy      User?  @relation("UserRemovedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+  accountsRemoved User[] @relation("UserRemovedBy")
+
   @@index([email])
+  /// Every listing filters on this, so it earns an index.
+  @@index([deletedAt])
 }
 
 /// One person's access to one client.

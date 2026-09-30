@@ -37,7 +37,15 @@ export default async function AdminPage() {
   const clients = await prisma.client.findMany({
     orderBy: { name: "asc" },
     include: {
-      _count: { select: { tasks: true, access: true } },
+      _count: {
+        select: {
+          tasks: true,
+          // Removed accounts keep their grants as part of the record, so the
+          // count has to exclude them or a client reads as shared with someone
+          // who can no longer sign in.
+          access: { where: { user: { deletedAt: null } } },
+        },
+      },
       tasks: { select: { status: true, progress: true } },
     },
   });

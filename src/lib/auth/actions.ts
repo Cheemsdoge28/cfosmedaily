@@ -63,10 +63,13 @@ export async function loginAction(
   // owned by one: it is blocked from *seeing* that client, which the grant join
   // in getSessionUser does. Someone with two clients, one suspended, should still
   // be able to sign in and work on the other.
-  if (!user || !user.isActive) {
+  // A removed account is treated exactly like one that never existed — same
+  // message, same timing — so the sign-in page cannot be used to discover that
+  // somebody used to work here.
+  if (!user || !user.isActive || user.deletedAt) {
     await recordAudit({
       action: "auth.login.failure",
-      detail: `unknown or inactive account: ${email}`,
+      detail: `unknown, inactive or removed account: ${email}`,
     });
     return { error: GENERIC_FAILURE };
   }

@@ -127,6 +127,10 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   }
 
   if (!session.user.isActive) return null;
+  // A removed account keeps its rows but loses its session the moment the mark
+  // is read — checked here rather than only at sign-in, so removing somebody
+  // who is already signed in takes effect on their next request.
+  if (session.user.deletedAt) return null;
 
   if (now - session.lastSeenAt.getTime() > TOUCH_INTERVAL_MS) {
     await prisma.session.update({
