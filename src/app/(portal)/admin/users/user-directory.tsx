@@ -83,14 +83,15 @@ export function UserDirectory({ users }: { users: DirectoryUser[] }) {
     const needle = query.trim().toLowerCase();
 
     return users.filter((user) => {
-      // Removed accounts are hidden unless asked for by name or by the filter —
-      // they are kept for the history they anchor, not to be browsed.
-      const removed = Boolean(user.removedAt);
-      if (filter === "removed") {
-        if (!removed) return false;
-      } else if (removed && !needle) {
-        return false;
-      }
+      // Removed accounts live behind the Removed filter and nowhere else.
+      //
+      // They used to surface in any filter as soon as you typed a search, on the
+      // reasoning that looking somebody up by name should find them. In practice
+      // that meant a removed account appearing in a list of current staff the
+      // moment a search narrowed it, which reads as though the removal did not
+      // take — so the rule is now the simple one: Removed shows only removed,
+      // every other filter shows only live. Search still works inside Removed.
+      if (Boolean(user.removedAt) !== (filter === "removed")) return false;
       if (filter === "staff" && user.role !== "PLATFORM_ADMIN") return false;
       if (filter === "members" && user.role === "PLATFORM_ADMIN") return false;
       if (filter === "attention" && !needsAttention(user)) return false;
