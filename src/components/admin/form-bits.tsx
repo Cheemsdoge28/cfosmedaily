@@ -195,7 +195,7 @@ export function Submit({
 }: {
   label: string;
   pendingLabel: string;
-  variant?: "default" | "outline" | "secondary" | "ghost";
+  variant?: "default" | "outline" | "secondary" | "ghost" | "destructive";
   className?: string;
 }) {
   const { pending } = useFormStatus();

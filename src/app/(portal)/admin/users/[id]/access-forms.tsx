@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { Feedback, Submit } from "@/components/admin/form-bits";
@@ -173,15 +173,23 @@ function SessionSubmit() {
 /**
  * Removing an account, and bringing it back.
  *
- * Removal is a mark, not a delete, and the copy says so plainly — an
- * administrator reaching for this needs to know before they press it that the
- * audit trail and the task history survive, because the alternative reading
- * ("this erases them") is the one that stops people using it and leaves dead
- * accounts lying around instead.
+ * Two deliberate choices here, and the first one I got wrong the first time.
  *
- * It is deliberately the last control on the page and deliberately not styled as
- * a destructive red button, because it is not destructive. Deactivation above it
- * is the reversible day-to-day tool; this is the one for somebody who has left.
+ * It is styled as destructive. Nothing is deleted — the audit trail, the tasks
+ * this account moved and the access it held all survive — and I originally took
+ * that to mean the control should not look alarming. That was reasoning about
+ * the database rather than about the person: to whoever is removed, this ends
+ * their access immediately and without warning, and a control with that
+ * consequence should look like it. "Reversible by an administrator" is not the
+ * same as "harmless".
+ *
+ * And it asks before it acts. The button reveals a confirmation naming the
+ * person and stating exactly what happens and what is kept, so the destructive
+ * click is never the first one and never lands on the wrong row of a list of
+ * similar-looking accounts. It is a two-step confirm rather than type-the-name,
+ * because removal *is* undoable — type-to-confirm is the right friction for
+ * something that cannot be undone, and using it here would train people to type
+ * names without reading.
  */
 export function RemovalForms({
   userId,
@@ -200,6 +208,7 @@ export function RemovalForms({
   grantCount: number;
   isSelf: boolean;
 }) {
+  const [confirming, setConfirming] = useState(false);
   const [removeState, removeAction] = useActionState(
     removeUserAction,
     INITIAL_ADMIN_STATE,
@@ -240,19 +249,62 @@ export function RemovalForms({
   return (
     <div className="space-y-3">
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Hides {userName} from the portal and signs them out. <b>Nothing is
-        deleted</b>: the audit trail, the tasks they moved and the client access
-        they held are kept, so the register stays answerable. The account can be
-        restored at any time.
-      </p>
-      <p className="text-xs leading-relaxed text-muted-foreground">
         For somebody who is only away, use <b>Deactivate</b> above — it blocks
-        sign-in but leaves them listed.
+        sign-in but leaves them listed. Removal is for somebody who has gone.
       </p>
-      <form action={removeAction}>
-        <input type="hidden" name="userId" value={userId} />
-        <Submit label="Remove account" pendingLabel="Removing…" variant="ghost" />
-      </form>
+
+      {confirming ? (
+        <div
+          role="group"
+          aria-label={`Confirm removing ${userName}`}
+          className="space-y-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4"
+        >
+          <p className="text-sm font-semibold text-destructive">
+            Remove {userName}?
+          </p>
+          <ul className="list-disc space-y-1 ps-5 text-xs leading-relaxed text-foreground">
+            <li>They are signed out immediately and cannot sign in again.</li>
+            <li>They disappear from the portal except under <b>Removed</b>.</li>
+            <li>
+              Kept: the audit trail, every task they moved, the imports they ran
+              {grantCount > 0
+                ? `, and their ${grantCount} client grant${grantCount === 1 ? "" : "s"}`
+                : ""}
+              .
+            </li>
+            <li>You can restore the account at any time.</li>
+          </ul>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <form action={removeAction}>
+              <input type="hidden" name="userId" value={userId} />
+              <Submit
+                label={`Yes, remove ${userName}`}
+                pendingLabel="Removing…"
+                variant="destructive"
+              />
+            </form>
+            <Button
+              type="button"
+              variant="ghost"
+              size="lg"
+              onClick={() => setConfirming(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button
+          type="button"
+          variant="destructive"
+          size="lg"
+          onClick={() => setConfirming(true)}
+        >
+          Remove account
+        </Button>
+      )}
+
       <Feedback state={removeState} />
     </div>
   );
